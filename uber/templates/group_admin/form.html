@@ -4,6 +4,14 @@
 {% block content %}
   {% include "group_admin/nav_menu.html" %}
 
+  {% if c.ATTENDEE_ACCOUNTS_ENABLED and group.leader and (c.LOCAL_ACCOUNTS_DISABLED or not group.leader.has_sso_email) and group.leader.is_valid and not group.leader.managers %}
+  <div class="alert alert-info no-account">
+    <strong>The leader of this group does not have an account yet.</strong>
+    <a href="#attendee_form?id={{ group.leader.id }}">View their registration</a> to see options for giving them access to the group.
+    <br/><br/>Group leaders have access to all badges in their group that do not already have an account, including unassigned badges.
+  </div>
+  {% endif %}
+
   {% include "check_in.html" %}
   <div class="card">
     <div class="card-body">
@@ -15,19 +23,19 @@
       <a class="btn btn-info" href="../guests/index?id={{ group.guest.id }}">{{ group.guest.group_type_label }} Checklist</a>
       {% endif %}
       </div>
-      {% if signnow_signed %}
+      {% if esign_signed %}
       <div class="col text-end">
-        <em>This dealer signed their SignNow document on {{ signnow_signed|datetime_local }}.</em>
+        <em>This dealer signed their Terms & Conditions agreement on {{ esign_signed|datetime_local }}.</em>
       </div>
-      {% elif signnow_last_emailed %}
+      {% elif esign_last_emailed %}
       <div class="col text-end">
-      <em>This dealer was last emailed their SignNow document at {{ signnow_last_emailed|datetime_local }}.</em>
-      <a class="btn btn-warning" href="../dealer_admin/resend_signnow_link?id={{ group.id }}">Resend SignNow Link</a>
+      <em>This dealer was last emailed their Terms & Conditions agreement at {{ esign_last_emailed|datetime_local }}.</em>
+      <a class="btn btn-warning" href="../dealer_admin/send_esign_link?id={{ group.id }}">Resend Agreement Link</a>
       </div>
-      {% elif c.SIGNNOW_DEALER_TEMPLATE_ID and group.is_dealer and group.status in c.DEALER_ACCEPTED_STATUSES %}
+      {% elif c.ESIGN_DEALER_TEMPLATE_ID and group.is_dealer and group.status in c.DEALER_ACCEPTED_STATUSES %}
       <div class="col text-end">
-      <em>This dealer has not been emailed a SignNow document yet.</em>
-      <a class="btn btn-success" href="../dealer_admin/resend_signnow_link?id={{ group.id }}">Send SignNow Link</a>
+      <em>This dealer has not been emailed an e-signature link yet.</em>
+      <a class="btn btn-success" href="../dealer_admin/send_esign_link?id={{ group.id }}">Send Agreement Link</a>
       </div>
       {% endif %}
     </div>
@@ -82,7 +90,13 @@
     <h3>New {{ c.DEALER_TERM|title if group.is_dealer else "Group" }} Info</h3>
   {% endif %}
   {{ form_macros.form_validation('group-form', 'validate_group') }}
-  <form novalidate method="post" id="group-form" action="form" enctype="multipart/form-data">
+  <form novalidate method="post" id="group-form" action="form" enctype="multipart/form-data" x-data="{
+    guest_group_type: {{ (group.guest_group_type or 0)|jsonize }},
+    is_dealer: {{ group.is_dealer|jsonize }},
+    is_new: {{ group.is_new|jsonize }},
+    badges: {{ 1 if group.is_new else group.badges }}, 
+    get showLeaderInfo() { return this.badges != 0 },
+  }">
     {{ csrf_token() }}
     <input type="hidden" name="id" value="{{ group.db_id }}" />
     <input type="hidden" name="new_dealer" value="{{ new_dealer or '' }}" />
@@ -101,9 +115,11 @@
     {% endif %}
 
     {% if group.is_new %}
+    <div x-show="showLeaderInfo">
     <hr/>
       <div class="form-text">Group Leader's Info</div>
       {% include "forms/group/leader_info.html" %}
+    </div>
     {% endif %}
     
     <div class="form-group">
@@ -194,11 +210,15 @@
     $(function () {
       if($.field('guest_group_type') && $.field('guest_group_type').length) {
         var autoTypeAndRibbon = function() {
-          if($.val('guest_group_type') == '{{ c.GUEST }}') {
+          if($.val('guest_group_type') != '0' && $.val('guest_group_type') != '{{ c.MIVS }}') {
             $.field('new_badge_type').val('{{ c.GUEST_BADGE }}');
-          } else if ($.val('guest_group_type') == '{{ c.BAND }}') {
-            $.field('new_badge_type').val('{{ c.GUEST_BADGE }}');
+          } else {
+            $.field('new_badge_type').val('{{ c.ATTENDEE_BADGE }}');
+          }
+          if ($.val('guest_group_type') == '{{ c.BAND }}') {
             $(':checkbox[value={{ c.BAND }}]').prop("checked","true");
+          } else {
+            $(':checkbox[value={{ c.BAND }}]').prop("checked",false);
           }
         };
         $.field('guest_group_type').change(autoTypeAndRibbon);

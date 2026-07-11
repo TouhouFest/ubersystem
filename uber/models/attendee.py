@@ -1507,7 +1507,7 @@ class Attendee(MagModel, TakesPaymentMixin):
                 watchentries = session.guess_attendee_watchentry(self)
                 return [w.to_dict() for w in watchentries]
         except Exception as ex:
-            log.warning('Error guessing watchlist entry: {}', ex)
+            log.warning('Error guessing watchlist entry: %s', ex)
             return None
 
     @property
