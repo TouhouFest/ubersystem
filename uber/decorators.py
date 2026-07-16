@@ -385,17 +385,21 @@ def csv_file(func):
 
     @wraps(func)
     def csvout(self, session, set_headers=True, **kwargs):
-        writer = StringIO()
-        func(self, csv.writer(writer), session, **kwargs)
-        output = writer.getvalue().encode('utf-8')
+        csv_filename = func.__name__ + datetime.now().strftime('%Y%m%d_%H%M') + '.csv'
+        with tempfile.NamedTemporaryFile(mode='w+', encoding='utf-8', dir=c.UPLOADED_FILES_DIR, delete_on_close=False) as tmp_file:
+            writer = csv.writer(tmp_file)
+            func(self, writer, session, **kwargs)
+            tmp_file.flush()
 
-        # set headers last in case there were errors, so end user still see error page
-        if set_headers:
-            cherrypy.response.headers['Content-Type'] = 'application/csv'
-            _set_response_filename(func.__name__ + datetime.now().strftime('%Y%m%d_%H%M') + '.csv')
+            if set_headers:
+                _set_response_filename(csv_filename)
 
-        track_report(kwargs)
-        return output
+            track_report(kwargs)
+            return serve_file(
+                tmp_file.name,
+                disposition="attachment",
+                name=csv_filename,
+                content_type='text/csv')
     return csvout
 
 
