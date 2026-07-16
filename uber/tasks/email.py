@@ -10,10 +10,10 @@ from pockets.autolog import log
 from sqlalchemy.orm import joinedload
 
 from uber import utils
-from uber.amazon_ses import email_sender
 from uber.automated_emails import AutomatedEmailFixture
 from uber.config import c
 from uber.decorators import render
+from uber.email import registry
 from uber.models import AutomatedEmail, Email, MagModel, Session
 from uber.tasks import celery
 
@@ -66,7 +66,7 @@ def send_email(
         log.info('Attempting to send email {}', locals())
 
         try:
-            error_msg = email_sender.sendEmail(
+            error_msg = registry.email_sender.sendEmail(
                             source=sender,
                             toAddresses=to,
                             replyToAddresses=replyto,

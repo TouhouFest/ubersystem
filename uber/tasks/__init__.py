@@ -1,12 +1,23 @@
 from celery import Celery
 from celery.signals import after_setup_logger, beat_init, worker_process_init
 
+from importlib import import_module
+
+from sys import path
+
 from uber.config import _config as config_dict
+from uber.email import registry
 from uber.models import Session
 
 
 __all__ = ['celery']
 
+for plugin_name in config_dict['plugins']:
+    path.append(f'/app/plugins/{plugin_name}')
+    plugin = import_module(plugin_name)
+    if callable(getattr(plugin, 'on_worker', None)):
+        plugin.on_worker()
+registry.initialize()
 
 celery = Celery('tasks')
 celery.conf.beat_schedule = {}
