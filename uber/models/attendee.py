@@ -1,3 +1,4 @@
+from uber.serializer import json_dumps, json_dumps_bytes
 import json
 import math
 import re
@@ -2145,7 +2146,7 @@ class Attendee(MagModel, TakesPaymentMixin):
         Work history for all past years, plus this year's work history,
         as a json formatted string.
         """
-        return json.dumps(self.all_years_json)
+        return json_dumps(self.all_years_json)
 
     @property
     def all_years_json(self):

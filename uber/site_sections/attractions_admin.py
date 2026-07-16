@@ -2,17 +2,62 @@ import uuid
 from datetime import datetime, timedelta
 
 import cherrypy
+from uber.utils import parse_date as dateparser
 import pytz
-from pockets import listify, sluggify
-from sqlalchemy.orm import subqueryload
+from sqlalchemy.orm import subqueryload, joinedload, selectinload, defaultload
 
 from uber.config import c
+from uber.custom_tags import readable_join
 from uber.decorators import ajax, all_renderable, csrf_protected, csv_file, not_site_mappable, site_mappable
 from uber.errors import HTTPRedirect
+from uber.forms import load_forms
 from uber.models import AdminAccount, Attendee, Attraction, AttractionFeature, AttractionEvent, AttractionSignup, \
-    utcmin
+    utcmin, EventLocation, Department
 from uber.site_sections.attractions import _attendee_for_badge_num
-from uber.utils import check, filename_safe
+from uber.tasks.attractions import send_waitlist_notification
+from uber.utils import localized_now, filename_safe, validate_model, get_api_service_from_server, slugify
+
+
+event_spec = {
+    'id': True,
+    'event_location_id': True,
+    'location_room_name': True,
+    'start_time': True,
+    'start_time_label': True,
+    'duration': True,
+    'time_span_label': True,
+    'slots': True,
+    'feature': True}
+
+
+signup_spec = {
+    'attraction_id': True,
+    'signup_time': True,
+    'checkin_time': True,
+    'on_waitlist': True,
+    'waitlist_position': True,
+    'is_checked_in': True,
+    'attraction': {
+        'name': True,
+    },
+    'event': event_spec}
+
+
+dummy_signup = {
+    'is_signed_up': False,
+    'signup_time': None,
+    'checkin_time': None,
+    'on_waitlist': False,
+    'waitlist_position': None,
+    'is_checked_in': False}
+
+
+def import_signups_open_time(attraction_feature_event, old_signups_open_time):
+    if not old_signups_open_time:
+        attraction_feature_event.signups_open_time = None
+        return
+    signups_open_time = pytz.UTC.localize(dateparser.parse(old_signups_open_time))
+    attraction_feature_event.signups_open_time = signups_open_time.replace(year=signups_open_time.year + 1)
 
 
 @all_renderable()
@@ -38,45 +83,187 @@ class Root:
             'message': message,
             'attractions': attractions
         }
+    
+    @site_mappable
+    def import_attractions(
+            self,
+            session,
+            target_server='',
+            api_token='',
+            message='',
+            attraction_ids=[],
+            **kwargs):
+        
+        attractions, existing_attractions, existing_attractions_by_id = [], [], {}
+        attraction_count, feature_count, event_count = 0, 0, 0
+        
+        if message:
+            service, uri = None, ''
+        else:
+            service, message, target_url = get_api_service_from_server(target_server, api_token)
+            uri = '{}/jsonrpc/'.format(target_url)
+
+        if not message and service:
+            existing_attractions_by_slug = {attraction.slug: attraction for attraction in session.query(Attraction)}
+
+            for id, name in sorted(service.attraction.list(), key=lambda t: t[1]):
+                from_slug = slugify(name)
+                existing_attraction = existing_attractions_by_slug.get(from_slug, None)
+                if existing_attraction:
+                    existing_attractions.append((id, existing_attraction.name))
+                    existing_attractions_by_id[id] = existing_attraction.id
+                else:
+                    attractions.append((id, name))
+
+            if attraction_ids and not message:
+                from_config = service.config.info()
+                FROM_EPOCH = c.EVENT_TIMEZONE.localize(datetime.strptime(from_config['PANELS_EPOCH'], '%Y-%m-%d %H:%M:%S.%f'))
+                EPOCH_DELTA = c.PANELS_EPOCH - FROM_EPOCH
+
+                for from_attraction_id in attraction_ids:
+                    from_attraction = service.attraction.features_events(attraction_id=from_attraction_id)
+                    to_attraction_id = existing_attractions_by_id.get(from_attraction_id, None)
+                    if to_attraction_id:
+                        to_attraction = session.get(Attraction, to_attraction_id)
+                    else:
+                        attraction_count += 1
+                        to_attraction = Attraction()
+                        for attr in ['name', 'description', 'full_description', 'checkin_reminder',
+                                     'advance_checkin', 'restriction', 'badge_num_required',
+                                     'populate_schedule', 'no_notifications', 'waitlist_available', 'waitlist_slots',
+                                     'signups_open_relative', 'slots']:
+                            setattr(to_attraction, attr, from_attraction.get(attr, None))
+                        import_signups_open_time(to_attraction, from_attraction.get('signups_open_time', None))
+                    
+                    for from_feature in from_attraction['features']:
+                        new_feature = False
+
+                        from_slug = slugify(from_feature['name'])
+                        to_feature = session.query(AttractionFeature).filter(AttractionFeature.slug == from_slug).first()
+                        if not to_feature:
+                            new_feature = True
+                            feature_count += 1
+
+                            to_feature = AttractionFeature(attraction_id=to_attraction.id)
+                            for attr in ['name', 'description', 'badge_num_required',
+                                         'populate_schedule', 'no_notifications', 'waitlist_available', 'waitlist_slots',
+                                         'signups_open_relative', 'slots']:
+                                setattr(to_feature, attr, from_feature.get(attr, None))
+                            import_signups_open_time(to_feature, from_feature.get('signups_open_time', None))
+                            
+                            from_dept = from_feature.get('department', {})
+                            if from_dept:
+                                to_dept = session.query(Department).filter(Department.name == from_feature['department']['name']).first()
+                                if to_dept:
+                                    to_feature.department_id = to_dept.id
+
+                        for from_event in from_feature['events']:
+                            start_time = pytz.UTC.localize(dateparser.parse(from_event['start_time'])) + EPOCH_DELTA
+                            if not new_feature:
+                                existing_event = session.query(AttractionEvent).join(AttractionFeature).filter(
+                                    AttractionFeature.id == to_feature.id,
+                                    AttractionEvent.start_time == start_time).first()
+                                if existing_event:
+                                    continue
+
+                            to_event = AttractionEvent(attraction_feature_id=to_feature.id, start_time=start_time)
+                            for attr in ['duration', 'populate_schedule', 'no_notifications', 'waitlist_available', 'waitlist_slots',
+                                         'signups_open_relative', 'slots']:
+                                setattr(to_event, attr, from_event.get(attr, None))
+                            import_signups_open_time(to_event, from_event.get('signups_open_time', None))
+                            
+                            event_location = session.query(EventLocation).filter(EventLocation.name == from_event['location']['name'])
+                            if event_location.count() == 1:
+                                to_event.event_location_id = event_location.first().id
+                            elif event_location.count() > 1:
+                                event_location_with_room = event_location.filter(EventLocation.room == from_event['location']['room'])
+                                if event_location_with_room.count() == 1:
+                                    to_event.event_location_id = event_location_with_room.first().id
+                            # We couldn't find a single matching room, so just give up
+
+                            to_feature.events.append(to_event)
+                            event_count += 1
+                            
+                        to_attraction.features.append(to_feature)
+                    session.add(to_attraction)
+
+                import_list = []
+                if attraction_count:
+                    import_list.append(f"{attraction_count} attraction(s)")
+                if feature_count:
+                    import_list.append(f"{feature_count} features(s)")
+                if event_count:
+                    import_list.append(f"{event_count} event(s)")
+                
+                if not import_list:
+                    message = "No new attractions, features, or events found to import!"
+                else:
+                    message = 'Successfully imported {} from {}'.format(readable_join(import_list), uri)
+                raise HTTPRedirect('import_attractions?target_server={}&api_token={}&message={}',
+                                   target_server, api_token, message)
+
+        return {
+            'target_server': target_server,
+            'target_url': uri,
+            'api_token': api_token,
+            'attractions': attractions,
+            'existing_attractions': existing_attractions,
+            'message': message,
+        }
 
     def form(self, session, message='', **params):
         attraction_id = params.get('id')
         if not attraction_id or attraction_id == 'None':
             raise HTTPRedirect('index')
+        
+        attraction = session.get(Attraction, attraction_id, options=[
+            joinedload(Attraction.department), selectinload(Attraction.events),
+            defaultload(Attraction.features).defaultload(AttractionFeature.events).selectinload(AttractionEvent.signups),
+        ])
+        
+        forms = load_forms(params, attraction, ['AttractionInfo'])
 
         if cherrypy.request.method == 'POST':
-            if 'advance_notices' in params:
-                ns = listify(params.get('advance_notices', []))
-                params['advance_notices'] = [int(n) for n in ns if n != '']
+            for form in forms.values():
+                form.populate_obj(attraction)
 
-            attraction = session.attraction(
-                params,
-                bools=Attraction.all_bools,
-                checkgroups=Attraction.all_checkgroups)
-            message = check(attraction)
-            if not message:
-                if not attraction.department_id:
-                    attraction.department_id = None
-                session.add(attraction)
-                raise HTTPRedirect(
-                    'form?id={}&message={}',
-                    attraction.id,
-                    '{} updated successfully'.format(attraction.name))
-        else:
-            attraction = session.query(Attraction) \
-                .filter_by(id=attraction_id) \
-                .options(
-                    subqueryload(Attraction.department),
-                    subqueryload(Attraction.features)
-                    .subqueryload(AttractionFeature.events)
-                    .subqueryload(AttractionEvent.attendees)) \
-                .order_by(Attraction.id).one()
+            if 'signups_open_type' in params:
+                attraction.update_signup_times(params['signups_open_type'])
+
+            attraction.update_dept_ids(session)
+            attraction.cascade_feature_event_attrs(session)
+            
+            raise HTTPRedirect(
+                'form?id={}&message={}',
+                attraction.id,
+                '{} updated successfully.'.format(attraction.name))
 
         return {
             'admin_account': session.current_admin_account(),
             'message': message,
-            'attraction': attraction
+            'attraction': attraction,
+            'forms': forms,
         }
+    
+    @ajax
+    def validate_attraction(self, session, form_list=[], **params):
+        if params.get('id') in [None, '', 'None']:
+            attraction = Attraction()
+        else:
+            attraction = session.attraction(params.get('id'))
+
+        if not form_list:
+            form_list = ['AttractionInfo']
+        elif isinstance(form_list, str):
+            form_list = [form_list]
+
+        forms = load_forms(params, attraction, form_list)
+        all_errors = validate_model(session, forms, attraction, is_admin=True)
+
+        if all_errors:
+            return {"error": all_errors}
+
+        return {"success": True}
 
     @ajax
     def open_signups(self, session, **params):
@@ -84,8 +271,9 @@ class Root:
         if not feature:
             return {'error': 'Feature not found!'}
 
-        for event in feature.events_by_location_by_day[int(params.get('location'))][params.get('day')]:
-            event.signups_open = True
+        for event in feature.events_by_location_by_day[params.get('location')][params.get('day')]:
+            event.signups_open_relative = 0
+            event.signups_open_time = datetime.now(pytz.UTC)
             session.add(event)
 
         session.commit()
@@ -97,8 +285,8 @@ class Root:
         if not feature:
             return {'error': 'Feature not found!'}
 
-        for event in feature.events_by_location_by_day[int(params.get('location'))][params.get('day')]:
-            event.signups_open = False
+        for event in feature.events_by_location_by_day[params.get('location')][params.get('day')]:
+            event.signups_open_time = None
             session.add(event)
 
         session.commit()
@@ -108,37 +296,35 @@ class Root:
         if params.get('id', 'None') != 'None':
             raise HTTPRedirect('form?id={}', params['id'])
 
-        if 'advance_notices' in params:
-            ns = listify(params.get('advance_notices', []))
-            params['advance_notices'] = [int(n) for n in ns if n != '']
-
         admin_account = session.current_admin_account()
-        attraction = session.attraction(
-            params,
-            bools=Attraction.all_bools,
-            checkgroups=Attraction.all_checkgroups)
-        if not attraction.department_id:
-            attraction.department_id = None
+        attraction = Attraction()
+        session.add(attraction)
+
+        forms = load_forms(params, attraction, ['AttractionInfo'])
 
         if cherrypy.request.method == 'POST':
-            message = check(attraction)
-            if not message:
-                attraction.owner = admin_account
-                session.add(attraction)
-                raise HTTPRedirect('form?id={}', attraction.id)
+            for form in forms.values():
+                form.populate_obj(attraction)
+
+            if 'signups_open_type' in params:
+                attraction.update_signup_times(params['signups_open_type'])
+
+            attraction.owner = admin_account
+
+            raise HTTPRedirect('form?id={}', attraction.id)
 
         return {
             'admin_account': admin_account,
             'attraction': attraction,
+            'forms': forms,
             'message': message,
         }
 
     @csrf_protected
     def delete(self, session, id, message=''):
         if cherrypy.request.method == 'POST':
-            attraction = session.query(Attraction).get(id)
-            attendee = session.admin_attendee()
-            if not attendee.can_admin_attraction(attraction):
+            attraction = session.get(Attraction, id)
+            if not session.current_admin_account().can_admin_attraction(attraction):
                 raise HTTPRedirect(
                     'form?id={}&message={}',
                     id,
@@ -155,65 +341,71 @@ class Root:
         if not attraction_id or attraction_id == 'None':
             attraction_id = None
 
-        if not attraction_id \
-                and (not params.get('id') or params.get('id') == 'None'):
-            raise HTTPRedirect('index')
-
-        feature = session.attraction_feature(
-            params,
-            bools=AttractionFeature.all_bools,
-            checkgroups=AttractionFeature.all_checkgroups)
+        if not params.get('id') or params.get('id') == 'None':
+            if attraction_id:
+                feature = AttractionFeature()
+            else:
+                raise HTTPRedirect('index')
+        else:
+            feature = session.attraction_feature(params.get('id'))
 
         attraction_id = feature.attraction_id or attraction_id
-        attraction = session.query(Attraction).filter_by(id=attraction_id) \
-            .order_by(Attraction.id).one()
+        attraction = session.get(Attraction, attraction_id)
+        
+        feature.attraction = attraction
+        if feature.is_new:
+            params = dict(feature.default_params, **params)
+        
+        forms = load_forms(params, feature, ['AttractionFeatureInfo'])
 
         if cherrypy.request.method == 'POST':
-            if feature.is_new:
-                feature.attraction_id = attraction_id
-            message = check(feature)
+            for form in forms.values():
+                form.populate_obj(feature)
 
-            if not message:
-                session.add(feature)
+            if 'signups_open_type' in params:
+                feature.update_signup_times(params['signups_open_type'])
 
-                raise HTTPRedirect(
-                    'form?id={}&message={}',
-                    attraction_id,
-                    'The {} feature was successfully {}'.format(
-                        feature.name, 'created' if feature.is_new else 'updated'))
-            session.rollback()
+            feature.update_name_desc(session)
+            feature.cascade_event_attrs(session)
+            session.add(feature)
+
+            raise HTTPRedirect(
+                'form?id={}&message={}',
+                attraction_id,
+                'The {} feature was successfully {}.'.format(
+                    feature.name, 'created' if feature.is_new else 'updated'))
 
         return {
             'attraction': attraction,
             'feature': feature,
+            'forms': forms,
             'message': message
         }
-
-    @csrf_protected
-    def delete_feature(self, session, id):
-        feature = session.query(AttractionFeature).get(id)
-        attraction_id = feature.attraction_id
-        message = ''
-        if cherrypy.request.method == 'POST':
-            attraction = session.query(Attraction).get(attraction_id)
-            if not session.admin_attendee().can_admin_attraction(attraction):
-                message = "You cannot delete a feature from an attraction you don't own"
-            else:
-                session.delete(feature)
-                raise HTTPRedirect(
-                    'form?id={}&message={}',
-                    attraction_id,
-                    'The {} feature was deleted'.format(feature.name))
-
-        if not message:
-            raise HTTPRedirect('form?id={}', attraction_id)
+    
+    @ajax
+    def validate_feature(self, session, form_list=[], **params):
+        if params.get('id') in [None, '', 'None']:
+            feature = AttractionFeature()
         else:
-            raise HTTPRedirect('form?id={}&message={}', attraction_id, message)
+            feature = session.attraction_feature(params.get('id'))
+
+        if not form_list:
+            form_list = ['AttractionFeatureInfo']
+        elif isinstance(form_list, str):
+            form_list = [form_list]
+
+        forms = load_forms(params, feature, form_list)
+        all_errors = validate_model(session, forms, feature, is_admin=True)
+
+        if all_errors:
+            return {"error": all_errors}
+
+        return {"success": True}
 
     @csv_file
     def export_feature(self, out, session, id):
         from uber.decorators import _set_response_filename
-        feature = session.query(AttractionFeature).get(id)
+        feature = session.get(AttractionFeature, id)
         _set_response_filename('{}.csv'.format(filename_safe(feature.name)))
         out.writerow(['Name', 'Badge Name', 'Badge Num', 'Signup Time', 'Checkin Time'])
         for event in feature.events:
@@ -226,94 +418,109 @@ class Root:
                     signup.checkin_time_label
                 ])
 
-    def event(
-            self,
-            session,
-            attraction_id=None,
-            feature_id=None,
-            previous_id=None,
-            delay=0,
-            message='',
-            **params):
-
-        if not attraction_id or attraction_id == 'None':
-            attraction_id = None
-        if not feature_id or feature_id == 'None':
-            feature_id = None
+    def event(self, session, previous_id=None, delay=0, message='', **params):
+        if params.get('feature_id', 'None') == 'None':
+            params['feature_id'] = None
         if not previous_id or previous_id == 'None':
             previous_id = None
 
-        if not attraction_id and not feature_id and not previous_id \
-                and (not params.get('id') or params.get('id') == 'None'):
-            raise HTTPRedirect('index')
-
-        event = session.attraction_event(
-            params,
-            bools=AttractionEvent.all_bools,
-            checkgroups=AttractionEvent.all_checkgroups)
-
-        if not event.is_new:
-            attraction_id = event.feature.attraction_id
-
-        previous = None
         feature = None
-        if feature_id:
-            feature = session.query(AttractionFeature).get(feature_id)
-            attraction_id = feature.attraction_id
 
         try:
             delay = int(delay)
         except ValueError:
             delay = 0
 
+        if not params['feature_id'] and not previous_id and params.get('id') in [None, '', 'None']:
+            raise HTTPRedirect('index?message={}', "Could not set up an event as we don't know what feature it should be in.")
+
+        if params.get('id') in [None, '', 'None']:
+            event = AttractionEvent()
+        else:
+            event = session.attraction_event(params.get('id'))
+            feature = event.feature
+
+        if not feature and (params['feature_id'] or params.get('attraction_feature_id', '')):
+            feature = session.get(AttractionFeature, params.get('attraction_feature_id', params['feature_id']))
+
+        if cherrypy.request.method != 'POST':
+            last_event = None
+
+            if previous_id:
+                last_event = session.attraction_event(previous_id)
+            elif event.is_new and feature and feature.events:
+                events_by_location = feature.events_by_location
+                location = next(reversed(events_by_location))
+                last_event = events_by_location[location][-1]
+
+            if last_event:
+                feature = last_event.feature
+                params.update({
+                    'attraction_feature_id': last_event.attraction_feature_id,
+                    'event_location_id': last_event.event_location_id,
+                    'start_time': last_event.end_time + timedelta(minutes=delay),
+                    'duration': last_event.duration,
+                })
+            
+            event.feature = feature
+            params = dict(event.default_params, **params)
+
+        params['attraction_id'] = feature.attraction_id
+        params['attraction_feature_id'] = feature.id
+
+        forms = load_forms(params, event, ['AttractionEventInfo'])
+
         if cherrypy.request.method == 'POST':
-            event.attraction_id = attraction_id
-            message = check(event)
-            if not message:
-                is_new = event.is_new
-                session.add(event)
-                session.flush()
-                session.refresh(event)
-                message = 'The event for {} was successfully {}'.format(
-                    event.label, 'created' if is_new else 'updated')
+            is_new = event.is_new
+            for form in forms.values():
+                form.populate_obj(event)
+            
+            if 'signups_open_type' in params:
+                event.update_signup_times(params['signups_open_type'])
 
-                for param in params.keys():
-                    if param.startswith('save_another_'):
-                        delay = param[13:]
-                        raise HTTPRedirect(
-                            'event?previous_id={}&delay={}&message={}',
-                            event.id, delay, message)
-                raise HTTPRedirect(
-                    'form?id={}&message={}', attraction_id, message)
-            session.rollback()
-        elif previous_id:
-            previous = session.query(AttractionEvent).get(previous_id)
-            attraction_id = previous.feature.attraction_id
-            event.feature = previous.feature
-            event.attraction_feature_id = previous.attraction_feature_id
-            event.attraction_id = attraction_id
-            event.location = previous.location
-            event.start_time = previous.end_time + timedelta(seconds=delay)
-            event.duration = previous.duration
-            event.slots = previous.slots
-        elif event.is_new and feature and feature.events:
-            events_by_location = feature.events_by_location
-            location = next(reversed(events_by_location))
-            recent = events_by_location[location][-1]
-            event.attraction_id = recent.attraction_id
-            event.location = recent.location
-            event.start_time = recent.end_time + timedelta(seconds=delay)
-            event.duration = recent.duration
-            event.slots = recent.slots
+            session.add(event)
+            session.flush()
+            session.refresh(event)
+            message = 'The event for {} was successfully {}.'.format(event.label, 'created' if is_new else 'updated')
+            
+            event.sync_with_schedule(session)
 
-        attraction = session.query(Attraction).get(attraction_id)
+            for param in params.keys():
+                if param.startswith('save_another_'):
+                    delay = param[13:]
+                    raise HTTPRedirect(
+                        'event?previous_id={}&delay={}&message={}',
+                        event.id, delay, message)
+            raise HTTPRedirect(
+                'form?id={}&message={}', feature.attraction_id, message)
 
         return {
-            'attraction': attraction,
-            'feature': feature or event.feature,
+            'attraction': session.get(Attraction, feature.attraction_id, options=[selectinload(Attraction.events)]),
+            'feature': feature,
             'event': event,
-            'message': message
+            'forms': forms,
+            'message': message,
         }
+
+    @ajax
+    def validate_event(self, session, form_list=[], **params):
+        if params.get('id') in [None, '', 'None']:
+            event = AttractionEvent()
+        else:
+            event = session.attraction_event(params.get('id'))
+
+        if not form_list:
+            form_list = ['AttractionEventInfo']
+        elif isinstance(form_list, str):
+            form_list = [form_list]
+
+        forms = load_forms(params, event, form_list)
+        all_errors = validate_model(session, forms, event, is_admin=True)
+
+        if all_errors:
+            return {"error": all_errors}
+
+        return {"success": True}
     
     @csv_file
     def signups_export(self, out, session, id):
@@ -335,8 +542,8 @@ class Root:
             gap = None
 
         if gap is not None and cherrypy.request.method == 'POST':
-            ref_event = session.query(AttractionEvent).get(id)
-            events_for_day = ref_event.feature.events_by_location_by_day[ref_event.location][ref_event.start_day_local]
+            ref_event = session.get(AttractionEvent, id)
+            events_for_day = ref_event.feature.events_by_location_by_day[ref_event.event_location_id][ref_event.start_day_local]
             attraction_id = ref_event.feature.attraction_id
 
             delta = None
@@ -356,13 +563,13 @@ class Root:
     def update_locations(self, session, feature_id, old_location, new_location):
         message = ''
         if cherrypy.request.method == 'POST':
-            feature = session.query(AttractionFeature).get(feature_id)
-            if not session.admin_attendee().can_admin_attraction(feature.attraction):
+            feature = session.get(AttractionFeature, feature_id)
+            if not session.current_admin_account().can_admin_attraction(feature.attraction):
                 message = "You cannot update rooms for an attraction you don't own"
             else:
                 for event in feature.events:
-                    if event.location == int(old_location):
-                        event.location = int(new_location)
+                    if event.event_location_id == old_location:
+                        event.event_location_id = new_location
                 session.commit()
         if message:
             return {'error': message}
@@ -371,33 +578,100 @@ class Root:
     def delete_event(self, session, id):
         message = ''
         if cherrypy.request.method == 'POST':
-            event = session.query(AttractionEvent).get(id)
+            event = session.get(AttractionEvent, id)
             attraction_id = event.feature.attraction_id
-            attraction = session.query(Attraction).get(attraction_id)
-            if not session.admin_attendee().can_admin_attraction(attraction):
-                message = "You cannot delete a event from an attraction you don't own"
+            attraction = session.get(Attraction, attraction_id)
+            if not session.current_admin_account().can_admin_attraction(attraction):
+                message = "You cannot delete a event from an attraction you don't own."
             else:
                 session.delete(event)
                 session.commit()
         if message:
             return {'error': message}
+        
+    @ajax
+    def delete_event_cascade(self, session, id):
+        message = ''
+        if cherrypy.request.method == 'POST':
+            event = session.get(AttractionEvent, id)
+            attraction_id = event.feature.attraction_id
+            attraction = session.get(Attraction, attraction_id)
+            if not session.current_admin_account().can_admin_attraction(attraction):
+                message = "You cannot delete a event from an attraction you don't own."
+            else:
+                if event.schedule_item:
+                    session.delete(event.schedule_item)
+                session.delete(event)
+                session.commit()
+        if message:
+            return {'error': message}
+    
+    @ajax
+    def delete_feature(self, session, id):
+        feature = session.get(AttractionFeature, id)
+        attraction_id = feature.attraction_id
+        message = ''
+        if cherrypy.request.method == 'POST':
+            attraction = session.get(Attraction, attraction_id)
+            if not session.current_admin_account().can_admin_attraction(attraction):
+                message = "You cannot delete a feature from an attraction you don't own."
+            else:
+                session.delete(feature)
+                session.commit()
+
+        if message:
+            return {'error': message}
+    
+    @ajax
+    def delete_feature_cascade(self, session, id):
+        feature = session.get(AttractionFeature, id)
+        attraction_id = feature.attraction_id
+        message = ''
+        if cherrypy.request.method == 'POST':
+            attraction = session.get(Attraction, attraction_id)
+            if not session.current_admin_account().can_admin_attraction(attraction):
+                message = "You cannot delete a feature from an attraction you don't own."
+            else:
+                for event in feature.events:
+                    if event.schedule_item:
+                        session.delete(event.schedule_item)
+                session.delete(feature)
+                session.commit()
+
+        if message:
+            return {'error': message}
 
     @ajax
     def cancel_signup(self, session, id):
+        # TODO: make this return the event for the admin checkin page
         message = ''
+        event = {}
         if cherrypy.request.method == 'POST':
-            signup = session.query(AttractionSignup).get(id)
+            signup = session.get(AttractionSignup, id)
             attraction_id = signup.event.feature.attraction_id
-            attraction = session.query(Attraction).get(attraction_id)
-            if not session.admin_attendee().can_admin_attraction(attraction):
-                message = "You cannot cancel a signup for an attraction you don't own"
+            attraction = session.get(Attraction, attraction_id)
+            if not session.current_admin_account().can_admin_attraction(attraction):
+                message = "You cannot cancel a signup for an attraction you don't own."
             elif signup.is_checked_in:
-                message = "You cannot cancel a signup that has already checked in"
+                message = "You cannot cancel a signup that has already checked in."
             else:
+                event = signup.event
+                event_dict = {
+                        'attraction_id': event.attraction_id,
+                        'attraction': {
+                            'name': event.attraction.name,
+                        },
+                        'event': event.to_dict(event_spec)
+                    }
+                event_dict.update(dummy_signup)
+
+                if not signup.on_waitlist:
+                    signup.event.add_next_waitlist(session)
                 session.delete(signup)
                 session.commit()
         if message:
             return {'error': message}
+        return {'event': event_dict}
 
     def checkin(self, session, message='', **params):
         id = params.get('id')
@@ -408,13 +682,23 @@ class Root:
             uuid.UUID(id)
             filters = [Attraction.id == id]
         except Exception:
-            filters = [Attraction.slug.startswith(sluggify(id))]
+            filters = [Attraction.slug.startswith(slugify(id))]
 
-        attraction = session.query(Attraction).filter(*filters).first()
+        attraction = session.query(Attraction).filter(*filters).options(
+            joinedload(Attraction.department)
+        ).first()
         if not attraction:
             raise HTTPRedirect('index')
+        
+        dept_name = ''
+        if attraction.department and len(attraction.department.attractions) > 1:
+            dept_name = attraction.department.name
 
-        return {'attraction': attraction, 'message': message}
+        return {
+            'attraction': attraction,
+            'dept_name': dept_name,
+            'message': message,
+            }
 
     @ajax
     def get_signups(self, session, badge_num, attraction_id=None):
@@ -436,38 +720,121 @@ class Root:
                 return {'error': 'Unrecognized badge number: {}'.format(badge_num)}
 
             signups = attendee.attraction_signups
+            other_events = []
             if attraction_id:
-                signups = [s for s in signups if s.event.feature.attraction_id == attraction_id]
+                min_time = localized_now() - timedelta(hours=4)
+                max_time = localized_now() + timedelta(hours=4)
+                attraction = session.attraction(attraction_id)
+                if attraction.department and len(attraction.department.attractions) > 1:
+                    attraction_ids = [a.id for a in attraction.department.attractions]
+                    signups = [s for s in signups if s.event.feature.attraction_id in attraction_ids]
+                else:
+                    signups = [s for s in signups if s.event.feature.attraction_id == attraction_id]
 
-            read_spec = {
-                'signup_time': True,
-                'checkin_time': True,
-                'is_checked_in': True,
-                'event': {
-                    'location': True,
-                    'location_label': True,
-                    'start_time': True,
-                    'start_time_label': True,
-                    'duration': True,
-                    'time_span_label': True,
-                    'slots': True,
-                    'feature': True}}
+                exclude_ids = [s.attraction_event_id for s in signups]
+                other_events = session.query(AttractionEvent).filter(
+                    AttractionEvent.attraction_id == attraction_id,
+                    ~AttractionEvent.id.in_(exclude_ids),
+                    AttractionEvent.start_time > min_time,
+                    AttractionEvent.start_time < max_time).all()
+
+            signups_and_events = []
+            for s_or_e in sorted(signups + other_events,
+                                 key=lambda se: se.event.start_time if getattr(se, 'event', None) else se.start_time):
+                if isinstance(s_or_e, AttractionSignup):
+                    signup_dict = s_or_e.to_dict(signup_spec)
+                    signup_dict['is_signed_up'] = True
+                    signups_and_events.append(signup_dict)
+                elif isinstance(s_or_e, AttractionEvent):
+                    event_dict = {
+                        'attraction_id': s_or_e.attraction_id,
+                        'attraction': {
+                            'name': s_or_e.attraction.name,
+                        },
+                        'event': s_or_e.to_dict(event_spec)
+                    }
+                    event_dict.update(dummy_signup)
+                    signups_and_events.append(event_dict)
 
             signups = sorted(signups, key=lambda s: s.event.start_time)
             return {
                 'result': {
-                    'signups': [s.to_dict(read_spec) for s in signups],
-                    'attendee': attendee.to_dict()
+                    'signups_and_events': signups_and_events,
+                    'attendee': attendee.to_dict(),
                 }
             }
+        
+    @ajax
+    def sign_up(self, session, id, attendee_id):
+        message = ''
+        overfilled = False
+        
+        if cherrypy.request.method == 'POST':
+            if not id:
+                return {'error': "Event ID is blank."}
+            if not attendee_id:
+                return {'error': "Attendee ID is blank."}
+            
+            event = session.get(AttractionEvent, id)
+            attendee = session.get(Attendee, attendee_id)
+            if not event:
+                return {'error': "Could not find event."}
+            if not attendee:
+                return {'error': "Could not find attendee."}
+            
+            if attendee in event.attendee_signups:
+                return {'error': f"{attendee.full_name} is already signed up for this event!"}
+            
+            if event.is_sold_out:
+                overfilled = True
+            
+            event.attendee_signups.append(attendee)
+            session.add(event)
+            session.commit()
+            session.refresh(event)
+
+            signup = session.query(AttractionSignup).filter(AttractionSignup.attendee_id == attendee.id,
+                                                            AttractionSignup.attraction_event_id == event.id).first()
+            if not signup:
+                return {'error': "Signup failed. Try refreshing the page."}
+            
+            if overfilled:
+                message = "This event is now over capacity."
+            elif event.is_sold_out:
+                message = "This event is now full."
+            
+            signup_dict = signup.to_dict(signup_spec)
+            signup_dict['is_signed_up'] = True
+
+            return {'signup': signup_dict, 'message': message}
+
+
+    @ajax
+    def pull_from_waitlist(self, session, id, email=False):
+        message = ''
+        email = True if email == 'true' else False
+        if cherrypy.request.method == 'POST':
+            signup = session.get(AttractionSignup, id)
+            if signup.is_checked_in:
+                message = "This attendee has already checked in."
+            else:
+                signup.on_waitlist = False
+                if email:
+                    send_waitlist_notification.delay(signup.id)
+                session.commit()
+                return {'result': ''}
+        if message:
+            return {'error': message}
 
     @ajax
     def checkin_signup(self, session, id):
         message = ''
         if cherrypy.request.method == 'POST':
-            signup = session.query(AttractionSignup).get(id)
+            signup = session.get(AttractionSignup, id)
             if signup.is_checked_in:
-                message = "You cannot check in a signup that has already checked in"
+                message = "This attendee has already checked in."
+            elif signup.on_waitlist:
+                message = "This attendee is still on the waitlist for this event."
             else:
                 signup.checkin_time = datetime.now(pytz.UTC)
                 session.commit()
@@ -478,6 +845,6 @@ class Root:
     @ajax
     def undo_checkin_signup(self, session, id):
         if cherrypy.request.method == 'POST':
-            signup = session.query(AttractionSignup).get(id)
+            signup = session.get(AttractionSignup, id)
             signup.checkin_time = utcmin.datetime
             session.commit()

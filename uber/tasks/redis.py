@@ -1,13 +1,16 @@
+from uber.serializer import json_dumps, json_dumps_bytes
 
 import json
 import re
-from dateutil import parser as dateparser
+import logging
+from uber.utils import parse_date as dateparser
 from datetime import datetime, timedelta
-from pockets.autolog import log
 from sqlalchemy import any_
 
 from uber.config import c, AWSSecretFetcher
 from uber.tasks import celery
+
+log = logging.getLogger(__name__)
 
 
 __all__ = ['expire_processed_saml_assertions', 'set_signnow_key', 'update_shirt_counts', 'update_problem_names']
@@ -21,7 +24,7 @@ def expire_processed_saml_assertions():
     rsession = c.REDIS_STORE.pipeline()
 
     for key, val in c.REDIS_STORE.hscan(c.REDIS_PREFIX + 'processed_saml_assertions')[1].items():
-        if int(val) < datetime.utcnow().timestamp():
+        if int(val) < datetime.now(UTC).timestamp():
             rsession.hdel(c.REDIS_PREFIX + 'processed_saml_assertions', key)
 
     rsession.execute()
@@ -64,6 +67,7 @@ def update_shirt_counts():
 
 @celery.schedule(timedelta(minutes=15))
 def update_problem_names():
+    return
     from uber.models import Attendee, Session
 
     posix_regex_list = []
@@ -105,7 +109,7 @@ def update_problem_names():
                         if origin_word not in origin_match_list:
                             origin_match_list.append(origin_word)
 
-            rsession.hset(c.REDIS_PREFIX + 'word_matches', attendee.id, json.dumps(word_match_list))
-            rsession.hset(c.REDIS_PREFIX + 'origin_words', attendee.id, json.dumps(origin_match_list))
+            rsession.hset(c.REDIS_PREFIX + 'word_matches', attendee.id, json_dumps(word_match_list))
+            rsession.hset(c.REDIS_PREFIX + 'origin_words', attendee.id, json_dumps(origin_match_list))
 
     rsession.execute()

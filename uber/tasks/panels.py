@@ -2,7 +2,7 @@ import json
 
 from collections import defaultdict
 from datetime import timedelta, datetime
-from dateutil import parser as dateparser
+from uber.utils import parse_date as dateparser
 from sqlalchemy import or_
 
 from uber.config import c

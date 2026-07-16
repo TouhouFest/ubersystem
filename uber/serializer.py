@@ -46,3 +46,39 @@ class serializer(json.JSONEncoder):
 serializer.register(datetime.date, lambda d: d.strftime('%Y-%m-%d'))
 serializer.register(datetime.datetime, lambda dt: dt.strftime(serializer._datetime_format))
 serializer.register(set, lambda s: sorted(list(s)))
+
+
+try:
+    import orjson
+
+    def _orjson_default(obj):
+        if type(obj) in serializer._registry:
+            return serializer._registry[type(obj)](obj)
+        for klass, preprocessor in serializer._registry.items():
+            if isinstance(obj, klass):
+                return preprocessor(obj)
+        raise TypeError(f"Type {type(obj)} is not JSON serializable")
+
+    def json_dumps(obj, cls=None):
+        if cls is None or cls is serializer:
+            return orjson.dumps(obj, default=_orjson_default).decode('utf-8')
+        return json.dumps(obj, cls=cls)
+
+    def json_dumps_bytes(obj, cls=None):
+        if cls is None or cls is serializer:
+            return orjson.dumps(obj, default=_orjson_default)
+        return json.dumps(obj, cls=cls).encode('utf-8')
+
+    def json_loads(s):
+        return orjson.loads(s)
+
+except ImportError:
+    def json_dumps(obj, cls=serializer):
+        return json.dumps(obj, cls=cls)
+
+    def json_dumps_bytes(obj, cls=serializer):
+        return json.dumps(obj, cls=cls).encode('utf-8')
+
+    def json_loads(s):
+        return json.loads(s)
+

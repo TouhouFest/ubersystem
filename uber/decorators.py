@@ -3,6 +3,7 @@ import csv
 import functools
 import inspect
 import json
+from uber.serializer import serializer, json_dumps_bytes
 import os
 import re
 import sqlalchemy
@@ -274,8 +275,8 @@ def ajax(func):
             traceback.print_exc()
             message = "Your session login may have timed out. Try logging in again." if c.ATTENDEE_ACCOUNTS_ENABLED else \
                 "There was an issue submitting the form. Please refresh and try again."
-            return json.dumps({'success': False, 'message': message, 'error': message}, cls=serializer).encode('utf-8')
-        return json.dumps(func(*args, **kwargs), cls=serializer).encode('utf-8')
+            return json_dumps_bytes({'success': False, 'message': message, 'error': message})
+        return json_dumps_bytes(func(*args, **kwargs))
     returns_json.ajax = True
     return returns_json
 
@@ -300,7 +301,7 @@ def ajax_gettable(func):
     @wraps(func)
     def returns_json(*args, **kwargs):
         cherrypy.response.headers['Content-Type'] = 'application/json'
-        return json.dumps(func(*args, **kwargs), cls=serializer).encode('utf-8')
+        return json.dumps_bytes(func(*args, **kwargs))
     return returns_json
 
 

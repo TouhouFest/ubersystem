@@ -1,7 +1,7 @@
 from datetime import datetime
 
 import cherrypy
-from dateutil import parser as dateparser
+from uber.utils import parse_date as dateparser
 from pytz import UTC
 
 from uber.config import c

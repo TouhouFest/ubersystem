@@ -1,3 +1,4 @@
+from uber.serializer import json_dumps, json_dumps_bytes
 import json
 import math
 import os
@@ -1436,7 +1437,7 @@ class Root:
     @public
     def stats(self):
         cherrypy.response.headers["Access-Control-Allow-Origin"] = "*"
-        return json.dumps({
+        return json_dumps({
             'badges_sold': c.BADGES_SOLD,
             'remaining_badges': c.REMAINING_BADGES,
             'badges_price': c.BADGE_PRICE,
@@ -1447,7 +1448,7 @@ class Root:
     @public
     def price(self):
         cherrypy.response.headers["Access-Control-Allow-Origin"] = "*"
-        return json.dumps({
+        return json_dumps({
             'badges_price': c.BADGE_PRICE
         })
 

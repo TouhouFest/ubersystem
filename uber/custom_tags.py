@@ -238,7 +238,7 @@ def format_image_size(val):
 @JinjaEnv.jinja_filter
 def jsonize(x):
     is_empty = x is None or isinstance(x, jinja2.runtime.Undefined)
-    return safe_string('{}' if is_empty else html.escape(json.dumps(x, cls=serializer), quote=False))
+    return safe_string('{}' if is_empty else html.escape(json_dumps(x), quote=False))
 
 
 @JinjaEnv.jinja_filter

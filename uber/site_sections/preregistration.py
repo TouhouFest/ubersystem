@@ -1,3 +1,4 @@
+from uber.serializer import json_dumps, json_dumps_bytes
 import json
 import six
 import uuid
@@ -203,7 +204,7 @@ class Root:
         raise HTTPRedirect(c.KIOSK_REDIRECT_URL)
 
     def check_prereg(self):
-        return json.dumps({
+        return json_dumps({
             'force_refresh': not c.AT_THE_CON and (c.AFTER_PREREG_TAKEDOWN or not c.ATTENDEE_BADGE_AVAILABLE)})
 
     def check_if_preregistered(self, session, message='', **params):

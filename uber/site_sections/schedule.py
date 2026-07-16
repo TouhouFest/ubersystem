@@ -1,3 +1,4 @@
+from uber.serializer import json_dumps, json_dumps_bytes
 import json
 import ics
 import pytz
@@ -5,7 +6,7 @@ import cherrypy
 
 from collections import defaultdict
 from datetime import datetime, time, timedelta
-from dateutil import parser as dateparser
+from uber.utils import parse_date as dateparser
 from time import mktime
 from pockets import listify
 from pockets.autolog import log
@@ -95,7 +96,7 @@ class Root:
     @schedule_view
     def panels_json(self, session):
         cherrypy.response.headers['Content-Type'] = 'application/json'
-        return json.dumps([
+        return json_dumps([
             {
                 'name': event.name,
                 'location': event.location_label,
