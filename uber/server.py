@@ -224,7 +224,7 @@ for setting, value in c.CHERRYPY.items():
 cherrypy.config.update(cherrypy_config)
 
 # In production, disable CherryPy's background file monitoring thread to save CPU stat cycles.
-if not getattr(c, 'DEVELOPMENT', False):
+if not c.DEV_BOX:
     cherrypy.engine.autoreload.unsubscribe()
 
 libpthread_path = ctypes.util.find_library("pthread")
