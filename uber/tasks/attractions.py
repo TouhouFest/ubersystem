@@ -1,36 +1,35 @@
+import asyncio
 from datetime import datetime, timedelta
 
 import pytz
-from pockets import groupify
-from pockets.autolog import log
+import logging
 from sqlalchemy.orm import subqueryload
 
+from uber.email import EmailService
 from uber.custom_tags import humanize_timedelta
 from uber.config import c
 from uber.decorators import render
-from uber.models import Session
+from uber.models import async_session
 from uber.models.attendee import Attendee
 from uber.models.attraction import Attraction, AttractionEvent, AttractionNotification, \
     AttractionNotificationReply, AttractionSignup
-from uber.tasks import celery
-from uber.tasks.email import send_email
-from uber.tasks.sms import get_twilio_client, send_sms_with_client
-from uber.utils import normalize_phone
+from uber.tasks import schedule, task
+from uber.tasks.sms import get_twilio_client, send_sms_with_client, send_sms_with_client_async
+from uber.utils import normalize_phone, groupify
+
+log = logging.getLogger(__name__)
 
 
-__all__ = ['attractions_check_notification_replies', 'attractions_send_notifications']
+__all__ = ['attractions_check_notification_replies', 'send_waitlist_notification', 'attractions_send_notifications']
 
 
-TEXT_TEMPLATE = 'Checkin for {signup.event.name} {checkin}, {signup.event.location_room_name}. Reply N to drop out'
-
-
-def attractions_check_notification_replies():
+async def attractions_check_notification_replies():
     twilio_client = get_twilio_client(c.PANELS_TWILIO_SID, c.PANELS_TWILIO_TOKEN)
     if not twilio_client or not c.PANELS_TWILIO_NUMBER:
         log.warn('SMS notification replies disabled for attractions')
         return
 
-    with Session() as session:
+    async with async_session() as session:
         messages = twilio_client.messages.list(to=c.PANELS_TWILIO_NUMBER)
         sids = set(m.sid for m in messages)
         existing_sids = set(
@@ -70,13 +69,75 @@ def attractions_check_notification_replies():
                 received_time=datetime.now(pytz.UTC),
                 sent_time=message.date_sent.replace(tzinfo=pytz.UTC),
                 body=message.body))
-            session.commit()
+            await session.commit()
 
-
-def attractions_send_notifications():
+@task
+async def send_waitlist_notification(signup_id):
     twilio_client = get_twilio_client(c.PANELS_TWILIO_SID, c.PANELS_TWILIO_TOKEN)
+    text_template = "You've been signed up from the waitlist for {signup.event.name} in {signup.event.location_room_name}, {signup.event.time_span_label}! Reply N to drop out"
 
-    with Session() as session:
+    async with async_session() as session:
+        signup = session.attraction_signup(signup_id)
+        attendee = signup.attendee
+        event = signup.event
+        if attendee.notification_pref == Attendee._NOTIFICATION_NONE or event.no_notifications:
+            return
+
+        ident = event.id + "_waitlist"
+        use_text = twilio_client \
+                    and c.PANELS_TWILIO_NUMBER \
+                    and attendee.cellphone \
+                    and attendee.notification_pref == Attendee._NOTIFICATION_TEXT
+        try:
+            if use_text:
+                type_ = Attendee._NOTIFICATION_TEXT
+                type_str = 'TEXT'
+                from_ = c.PANELS_TWILIO_NUMBER
+                to_ = attendee.cellphone
+                body = text_template.format(signup=signup)
+                subject = ''
+                sid = await send_sms_with_client_async(twilio_client, to_, body, from_)
+            else:
+                type_ = Attendee._NOTIFICATION_EMAIL
+                type_str = 'EMAIL'
+                from_ = c.ATTRACTIONS_EMAIL
+                to_ = attendee.email_to_address
+                EmailService.queue_email(session, 'signup_from_waitlist', signup)
+        except Exception:
+            log.error(
+                'Error sending notification\n'
+                '\tfrom: {}\n'
+                '\tto: {}\n'
+                '\tsubject: {}\n'
+                '\tbody: {}\n'
+                '\ttype: {}\n'
+                '\tattendee: {}\n'
+                '\tident: {}\n'.format(
+                    from_,
+                    to_,
+                    subject,
+                    body,
+                    type_str,
+                    attendee.id,
+                    ident), exc_info=True)
+        else:
+            session.add(AttractionNotification(
+                attraction_event_id=event.id,
+                attraction_id=event.attraction_id,
+                attendee_id=attendee.id,
+                notification_type=type_,
+                ident=ident,
+                sid=sid,
+                sent_time=datetime.now(pytz.UTC),
+                subject=subject,
+                body=body))
+            await session.commit()
+
+async def attractions_send_notifications():
+    twilio_client = get_twilio_client(c.PANELS_TWILIO_SID, c.PANELS_TWILIO_TOKEN)
+    text_template = 'Check-in for {signup.event.name} {checkin}, {signup.event.location_room_name}. Reply N to drop out'
+
+    async with async_session() as session:
         for attraction in session.query(Attraction):
             now = datetime.now(pytz.UTC)
             from_time = now - timedelta(seconds=300)
@@ -105,15 +166,11 @@ def attractions_send_notifications():
                                 signup.id))
 
                         session.delete(signup)
-                        session.commit()
+                        await session.commit()
                     except Exception:
                         log.error('ERROR: Failed to delete signup with unassigned attendee', exc_info=True)
                     continue
 
-                # The first time someone signs up for an attractions, they always
-                # receive the welcome email (even if they've chosen SMS or None
-                # for their notification prefs). If they've chosen to receive SMS
-                # notifications, they'll also get a text message.
                 is_first_signup = not (attendee.attraction_notifications)
 
                 if not is_first_signup and attendee.notification_pref == Attendee._NOTIFICATION_NONE:
@@ -126,12 +183,8 @@ def attractions_send_notifications():
 
                 event = signup.event
 
-                # If we overlap multiple notices, we only want to send a single
-                # notification. So if we have both "5 minutes before checkin" and
-                # "when checkin starts", we only want to send the notification
-                # for "when checkin starts".
                 advance_notice = min(advance_notices)
-                if advance_notice == -1 or advance_notice > 1800:
+                if advance_notice == -1 or advance_notice > 30:
                     checkin = 'is at {}'.format(event.checkin_start_time_label)
                 else:
                     checkin = humanize_timedelta(
@@ -150,29 +203,19 @@ def attractions_send_notifications():
                         type_str = 'TEXT'
                         from_ = c.PANELS_TWILIO_NUMBER
                         to_ = attendee.cellphone
-                        body = TEXT_TEMPLATE.format(signup=signup, checkin=checkin)
+                        body = text_template.format(signup=signup, checkin=checkin)
                         subject = ''
-                        sid = send_sms_with_client(twilio_client, to_, body, from_)
+                        sid = await send_sms_with_client_async(twilio_client, to_, body, from_)
 
                     if not use_text or is_first_signup:
                         type_ = Attendee._NOTIFICATION_EMAIL
                         type_str = 'EMAIL'
                         from_ = c.ATTRACTIONS_EMAIL
                         to_ = attendee.email_to_address
-                        if is_first_signup:
-                            template = 'emails/panels/attractions_welcome.html'
-                            subject = 'Welcome to {} Attractions'.format(c.EVENT_NAME)
-                        else:
-                            template = 'emails/panels/attractions_notification.html'
-                            subject = 'Checkin for {} is at {}'.format(event.name, event.checkin_start_time_label)
-
-                        body = render(template, {
-                            'signup': signup,
-                            'checkin': checkin,
-                            'c': c}, encoding=None)
+                        email_ident = 'first_attractions_signup' if is_first_signup else 'signup_checkin_notice'
+                        EmailService.queue_email(session, email_ident, signup,
+                                                 data={'checkin': checkin, 'c': c})
                         sid = ident
-                        send_email.delay(from_, to_, subject=subject, body=body, format='html',
-                                         model=attendee.to_dict(), ident=ident)
                 except Exception:
                     log.error(
                         'Error sending notification\n'
@@ -201,11 +244,11 @@ def attractions_send_notifications():
                         sent_time=datetime.now(pytz.UTC),
                         subject=subject,
                         body=body))
-                    session.commit()
+                    await session.commit()
 
 
 if c.ATTRACTIONS_ENABLED:
-    attractions_send_notifications = celery.schedule(timedelta(minutes=3))(attractions_send_notifications)
+    attractions_send_notifications = schedule(timedelta(minutes=3))(attractions_send_notifications)
     if c.SEND_SMS and c.PANELS_TWILIO_NUMBER and c.PANELS_TWILIO_SID and c.PANELS_TWILIO_TOKEN:
-        attractions_check_notification_replies = celery.schedule(
+        attractions_check_notification_replies = schedule(
             timedelta(minutes=3))(attractions_check_notification_replies)

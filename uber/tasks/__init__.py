@@ -1,59 +1,51 @@
-from celery import Celery
-from celery.signals import after_setup_logger, beat_init, worker_process_init
+import logging
+from datetime import timedelta
 
 from uber.config import _config as config_dict
-from uber.models import Session
+from uber.models import Session, async_session
+from uber.tasks.saq_app import saq_app, schedule_to_cron
+
+log = logging.getLogger(__name__)
+
+__all__ = ['task', 'schedule', 'on_startup', 'crontab', 'saq_app', 'celery', 'async_session']
 
 
-__all__ = ['celery']
+class CrontabSchedule:
+    def __init__(self, minute="*", hour="*", day_of_month="*", month_of_year="*", day_of_week="*"):
+        self.minute = minute
+        self.hour = hour
+        self.day_of_month = day_of_month
+        self.month_of_year = month_of_year
+        self.day_of_week = day_of_week
+
+    def __str__(self):
+        return f"{self.minute} {self.hour} {self.day_of_month} {self.month_of_year} {self.day_of_week}"
 
 
-celery = Celery('tasks')
-celery.conf.beat_schedule = {}
-celery.conf.beat_startup_tasks = []
-celery.conf.update(config_dict['celery'])
-
-broker_url = config_dict['secret']['broker_url']
-
-celery.conf.broker_transport_options = {'global_keyprefix': config_dict['secret']['broker_prefix']}
-celery.conf.update(result_backend_transport_options={
-    'global_prefix': config_dict['secret']['broker_prefix']
-})
-celery.conf.update(broker_url=broker_url)
-celery.conf.update(result_backend=broker_url.replace("amqps://", "rpc://").replace("amqp://", "rpc://"))
-celery.conf.update(task_ignore_result=True)
+def crontab(minute="*", hour="*", day_of_month="*", month_of_year="*", day_of_week="*"):
+    return CrontabSchedule(minute=minute, hour=hour, day_of_month=day_of_month,
+                           month_of_year=month_of_year, day_of_week=day_of_week)
 
 
-def celery_on_startup(fn, *args, **kwargs):
-    celery.conf.beat_startup_tasks.append((celery.task(fn), args, kwargs))
+task = saq_app.task
+schedule = saq_app.schedule
 
 
-def celery_schedule(schedule, *args, **kwargs):
-    def _decorator(fn):
-        task = celery.task(fn)
-        celery.conf.beat_schedule[task.name] = {
-            'task': task.name,
-            'schedule': schedule,
-            'args': args,
-            'kwargs': kwargs,
-        }
-        return task
-    return _decorator
+def on_startup(fn, *args, **kwargs):
+    registered = saq_app.task(fn)
+    return registered
 
 
-celery.on_startup = celery_on_startup
-celery.schedule = celery_schedule
+class CeleryCompatShim:
+    """Backward compatibility shim mapping legacy Celery decorator calls to SAQ."""
+    def __init__(self, app):
+        self.app = app
+        self.task = app.task
+        self.schedule = app.schedule
+        self.on_startup = on_startup
 
 
-@worker_process_init.connect
-def init_worker_process(*args, **kwargs):
-    Session.initialize_db(initialize=True)
-
-
-@beat_init.connect
-def run_startup_tasks(*args, **kwargs):
-    for fn, a, kw in celery.conf.beat_startup_tasks:
-        fn.delay(*a, **kw)
+celery = CeleryCompatShim(saq_app)
 
 
 from uber.tasks import attractions  # noqa: F401, E402

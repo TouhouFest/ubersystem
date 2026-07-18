@@ -1,34 +1,36 @@
 
 import json
 import re
+import logging
 from dateutil import parser as dateparser
 from datetime import datetime, timedelta
-from pockets.autolog import log
 from sqlalchemy import any_
 
 from uber.config import c, AWSSecretFetcher
-from uber.tasks import celery
+from uber.tasks import schedule
+
+log = logging.getLogger(__name__)
 
 
 __all__ = ['expire_processed_saml_assertions', 'set_signnow_key', 'update_shirt_counts', 'update_problem_names']
 
 
-@celery.schedule(timedelta(minutes=30))
-def expire_processed_saml_assertions():
+@schedule(timedelta(minutes=30))
+async def expire_processed_saml_assertions():
     if not c.SAML_SETTINGS:
         return
 
     rsession = c.REDIS_STORE.pipeline()
 
     for key, val in c.REDIS_STORE.hscan(c.REDIS_PREFIX + 'processed_saml_assertions')[1].items():
-        if int(val) < datetime.utcnow().timestamp():
+        if int(val) < datetime.now(UTC).timestamp():
             rsession.hdel(c.REDIS_PREFIX + 'processed_saml_assertions', key)
 
     rsession.execute()
 
 
-@celery.schedule(timedelta(15))
-def set_signnow_key():
+@schedule(timedelta(15))
+async def set_signnow_key():
     if not c.AWS_SIGNNOW_SECRET_NAME or not c.SIGNNOW_DEALER_TEMPLATE_ID:
         return
 
@@ -43,8 +45,8 @@ def set_signnow_key():
         c.REDIS_STORE.expireat(c.REDIS_PREFIX + 'signnow_access_token', int(expire_date.timestamp()))
 
 
-@celery.schedule(timedelta(seconds=30))
-def update_shirt_counts():
+@schedule(timedelta(seconds=30))
+async def update_shirt_counts():
     if not c.PRE_CON:
         return
 
@@ -62,9 +64,10 @@ def update_shirt_counts():
 
     rsession.execute()
 
-@celery.schedule(timedelta(minutes=15))
-def update_problem_names():
-    from uber.models import Attendee, Session
+@schedule(timedelta(minutes=15))
+async def update_problem_names():
+    return
+    from uber.models import Attendee, async_session
 
     posix_regex_list = []
     python_regex_dict = {}
@@ -79,7 +82,7 @@ def update_problem_names():
 
     rsession = c.REDIS_STORE.pipeline()
 
-    with Session() as session:
+    async with async_session() as session:
         attendees = session.query(Attendee).filter(Attendee.badge_printed_name.regexp_match(any_(posix_regex_list),
                                                                                             flags="i")).all()
 

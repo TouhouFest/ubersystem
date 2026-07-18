@@ -12,11 +12,12 @@ x-uber: &uber
     - uber_cherrypy_server_socket_timeout=1
     - uber_cherrypy_tools_sessions_host=redis
     - uber_cherrypy_tools_sessions_prefix=uber
-    - uber_cherrypy_tools_sessions_storage_type=redis
+    - uber_cherrypy_tools_sessions_storage_class=RedisSession
     - uber_loggers_cherrypy_access=DEBUG
     - uber_redis_host=redis
-    - uber_secret_broker_url=amqp://celery:celery@rabbitmq:5672/uber
     - uber_hostname=localhost
+    - uber_dev_box=True
+    - SQLALCHEMY_WARN_20=1
   volumes:
     - .:/app/
     - ${PLUGIN_DIR_SRC:-./README.md}:${PLUGIN_DIR_TARGET:-/tmp/README.md}
@@ -28,43 +29,25 @@ services:
     <<: *uber
     ports:
       - 80:80
-  celery-beat:
+  saq-worker:
     <<: *uber
-    command: ['celery-beat']
-  celery-worker:
-    <<: *uber
-    command: ['celery-worker']
+    command: ['saq-worker']
   db:
     image: postgres
+    ports:
+      - 25432:5432
     environment:
       - POSTGRES_PASSWORD=uber_db
       - POSTGRES_USER=uber_db
       - POSTGRES_DB=uber_db
   redis:
     image: redis
-  rabbitmq:
-    ports:
-      - "5672"
-    image: rabbitmq:4.0-alpine
-    environment:
-      - RABBITMQ_DEFAULT_USER=celery
-      - RABBITMQ_DEFAULT_PASS=celery
-      - RABBITMQ_DEFAULT_VHOST=uber
   python-repl:
     container_name: ${COMPOSE_PROJECT_NAME}-python
     <<: *uber
     stdin_open: true
     tty: true
     command: ['python']
-    profiles: ["dev"]
-  flower:
-    container_name: ${COMPOSE_PROJECT_NAME}-flower
-    image: mher/flower:2.0
-    environment:
-      - CELERY_BROKER_URL=amqp://celery:celery@rabbitmq:5672/uber
-      - FLOWER_PORT=5555
-    ports:
-      - 5555:5555
     profiles: ["dev"]
   nginx:
     image: nginx
