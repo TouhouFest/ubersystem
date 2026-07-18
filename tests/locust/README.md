@@ -6,7 +6,7 @@ Load testing using [locust.io](http://locust.io).
 
 On your development computer, in the ubersystem repo cloned from github:
 ```
-pip install -r tests/locust/requirements.txt
+uv sync --extra locust
 ```
 
 ## Running Load Tests
@@ -36,7 +36,7 @@ cd tests/locust
 4. On your development computer, start the locust swarm and point it at the
 target server you want to load test
 ```
-locust --host=https://staging-reggie.magfest.org
+uv run locust --host=https://staging-reggie.magfest.org
 ```
 
 5. Open the locust user interface in your browser and start swarming!
