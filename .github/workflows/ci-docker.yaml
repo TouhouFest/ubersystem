@@ -1,7 +1,7 @@
 ---
 name: Build Docker Image
 
-on: [push, workflow_dispatch]
+on: [push, pull_request, workflow_dispatch]
 
 jobs:
   downstream:
@@ -61,22 +61,31 @@ jobs:
           # cache-to: type=gha,mode=max
 
   build:
+    name: Build Docker Container
     permissions:
       contents: read
       packages: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v1
+        uses: actions/checkout@v4
+
+      - name: Set sanitized image repository and tag
+        run: |
+          IMAGE_REPO=$(echo "${{ vars.UBER_REPO || github.repository }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_TAG=$(echo "${{ github.ref_name }}" | sed 's/[^a-zA-Z0-9._-]/-/g')
+          echo "IMAGE_REPOSITORY=$IMAGE_REPO" >> $GITHUB_ENV
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
 
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
 
       - name: Login to GHCR
-        uses: docker/login-action@v1
+        if: ${{ github.ref_name == 'touhoufest2027' && github.event_name == 'push' && !github.event.repository.fork }}
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.repository_owner }}
+          username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
 # TODO: Enable tests once we can run Postgres in CI
@@ -101,7 +110,7 @@ jobs:
           build-args: BRANCH=${{ github.ref_name }}
           platforms: linux/amd64,linux/arm64
           context: "."
-          push: true
-          tags: ghcr.io/${{ vars.UBER_REPO || github.repository }}:${{ github.ref_name }}
-          # cache-from: type=gha
-          # cache-to: type=gha,mode=max
+          push: ${{ github.ref_name == 'touhoufest2027' && github.event_name == 'push' && !github.event.repository.fork }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: ghcr.io/${{ env.IMAGE_REPOSITORY }}:${{ env.IMAGE_TAG }}
