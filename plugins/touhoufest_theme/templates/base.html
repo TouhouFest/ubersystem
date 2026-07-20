@@ -1,0 +1,121 @@
+{% import 'macros.html' as macros with context %}
+{% set page_ro = false %}
+{% set bootstrap5 = 'preregistration' in c.PAGE_PATH or 'landing' in c.PAGE_PATH or 'art_show_applications' in c.PAGE_PATH or 'attractions' in c.PAGE_PATH or 'hotel_lottery' in c.PAGE_PATH or 'marketplace' in c.PAGE_PATH or 'staffing' in c.PAGE_PATH or admin_area %}
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+    {{ macros.ie7_compatibility_check() }}
+    <title>{{ c.EVENT_NAME }} - {% block title %}{{ title_text }}{% endblock %}</title>
+    <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjUiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNSAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMTEuNSIgZmlsbD0iI0ZCRjdFQiIgc3Ryb2tlPSIjQkYzNDQ0Ii8+CjxnIGNsaXAtcGF0aD0idXJsKCNjbGlwMF80Njc5XzEwNTI5ODEpIj4KPHBhdGggZD0iTTEyLjk5IDAuMDFDMTIuODkgMCAxMi43OSAwIDEyLjY4IDBDMTIuNTggMCAxMi40OCAwIDEyLjM3IDAuMDFDNS45IDAuMTcgMC42OSA1LjQ3IDAuNjkgMTEuOTlDMC42OSAxOC41MSA1LjcgMjMuNjEgMTIgMjMuOTZDOS4wMSAyMy42MiA2LjY5IDIxLjA4IDYuNjkgMThDNi42OSAxNC42OSA5LjM3IDEyLjAxIDEyLjY5IDEyLjAxVjExLjk5QzE2IDExLjk5IDE4LjY4IDkuMzEgMTguNjggNkMxOC42OCAyLjY4IDE2LjE2IDAuMTcgMTIuOTkgMC4wMVpNMTIuNjggOC4xNkMxMS40IDguMTYgMTAuMzYgNy4xMiAxMC4zNiA1Ljg0QzEwLjM2IDQuNTYgMTEuNCAzLjUyIDEyLjY4IDMuNTJDMTMuOTYgMy41MiAxNC45OSA0LjU2IDE0Ljk5IDUuODRDMTQuOTkgNy4xMiAxMy45NiA4LjE2IDEyLjY4IDguMTZaIiBmaWxsPSIjQkYzNDQ0Ii8+CjxwYXRoIGQ9Ik0xMiAyMy45NkMxMi4yMiAyMy45OSAxMi40NSAyNCAxMi42OSAyNEMxMi45MiAyNCAxMy4xNSAyMy45OSAxMy4zNyAyMy45NkMxMy4xNCAyMy45NyAxMi45MiAyMy45OCAxMi42OSAyMy45OEMxMi40NSAyMy45OCAxMi4yMyAyMy45NyAxMiAyMy45NloiIGZpbGw9IiNCRjM0NDQiLz4KPHBhdGggZD0iTTEyLjY4IDIwLjMyQzEzLjk2IDIwLjMyIDE0Ljk5IDE5LjI4IDE0Ljk5IDE4LjAxQzE0Ljk5IDE2LjczIDEzLjk2IDE1LjY5IDEyLjY4IDE1LjY5QzExLjQgMTUuNjkgMTAuMzYgMTYuNzMgMTAuMzYgMTguMDFDMTAuMzYgMTkuMjggMTEuNCAyMC4zMiAxMi42OCAyMC4zMloiIGZpbGw9IiNCRjM0NDQiLz4KPC9nPgo8ZGVmcz4KPGNsaXBQYXRoIGlkPSJjbGlwMF80Njc5XzEwNTI5ODEpIj4KPHJlY3Qgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiBmaWxsPSJ3aGl0ZSIgdHJhbnNmb3JtPSJ0cmFuc2Zvcm0oMC42OSkiLz4KPC9jbGlwUGF0aD4KPC9kZWZzPgo8L3N2Zz4K" type="image/svg+xml" />
+
+    {% block head_styles %}
+        {{ "deps/combined.min.css"|serve_static_content }}
+        <link rel="stylesheet" href="../static_views/styles/main.css" />
+        {% if bootstrap5 %}
+        {{ "deps/bootstrap5/bootstrap.min.css"|serve_static_content }}
+        {{ "deps/bootstrap5/font-awesome.min.css"|serve_static_content }}
+        {{ "deps/bootstrap5/datatables.min.css"|serve_static_content }}
+        {% else %}
+        {{ "deps/bootstrap3/bootstrap.min.css"|serve_static_content }}
+        {{ "deps/bootstrap3/datatables.min.css"|serve_static_content }}
+        {% endif %}
+        {% if admin_area %}
+            <link rel="stylesheet" type="text/css" href="../static_views/additional-styles.css" />
+        {% else %}
+            {{ "theme/prereg.css"|serve_static_content }}
+            {{ "theme/prereg_extra.css"|serve_static_content }}
+        {% endif %}
+    {% endblock %}
+    {% block head_scripts %}
+        <script>
+            window.page_path = "{{ c.PAGE_PATH }}";
+            {% if not c.DEV_BOX %}jQuery.migrateMute = true;{% endif %}
+        </script>
+        {{ "deps/combined.min.js"|serve_static_content }}
+        {% if bootstrap5 %}
+        {{ "deps/bootstrap5/bootstrap.bundle.min.js"|serve_static_content }}
+        {{ "deps/bootstrap5/datatables.min.js"|serve_static_content }}
+        {% else %}
+        {{ "deps/bootstrap3/bootstrap.min.js"|serve_static_content }}
+        {{ "deps/bootstrap3/datatables.min.js"|serve_static_content }}
+        {% endif %}
+        <script src="../static_views/javascript/main.js"></script>
+        <script>
+            window.client_session = {{ c.CLIENT_SESSION_JSON }};
+            window.client_session_defaults = {{ c.CLIENT_SESSION_DEFAULTS_JSON }};
+            {% if c.PAGE_PATH not in c.PAGE_PATH_OPTS %}
+                window.client_page = {};
+            {% else %}
+                window.client_page = {{ c.PAGE_PATH_OPTS[c.PAGE_PATH]|to_json }};
+            {% endif %}
+        </script>
+        <script src="../static_views/javascript/csrf.js"></script>
+    {% endblock %}
+    {% block extra_head %}{% endblock %}
+    {% if c.DEV_BOX or c.PAGE_PATH not in c.INDEXABLE_PAGE_PATHS %}<meta name="robots" content="noindex">{% endif %}
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body class="{% block body_class %}{% endblock %}" data-bs-theme="light">
+    {% block masthead %}
+    {% endblock %}
+    <div id="mainContainer" class="container-fluid">
+        {% block backlink %}
+        {% if admin_area %}
+        <nav class="navbar navbar-expand-lg navbar-light bg-light">
+            <div class="container-fluid">
+              <a class="navbar-brand"{% if c.CURRENT_ADMIN %} href="../accounts/homepage"{% endif %}>
+                <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjUiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNSAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMTEuNSIgZmlsbD0iI0ZCRjdFQiIgc3Ryb2tlPSIjQkYzNDQ0Ii8+CjxnIGNsaXAtcGF0aD0idXJsKCNjbGlwMF80Njc5XzEwNTI5ODEpIj4KPHBhdGggZD0iTTEyLjk5IDAuMDFDMTIuODkgMCAxMi43OSAwIDEyLjY4IDBDMTIuNTggMCAxMi40OCAwIDEyLjM3IDAuMDFDNS45IDAuMTcgMC42OSA1LjQ3IDAuNjkgMTEuOTlDMC42OSAxOC41MSA1LjcgMjMuNjEgMTIgMjMuOTZDOS4wMSAyMy42MiA2LjY5IDIxLjA4IDYuNjkgMThDNi42OSAxNC42OSA5LjM3IDEyLjAxIDEyLjY5IDEyLjAxVjExLjk5QzE2IDExLjk5IDE4LjY4IDkuMzEgMTguNjggNkMxOC42OCAyLjY4IDE2LjE2IDAuMTcgMTIuOTkgMC4wMVpNMTIuNjggOC4xNkMxMS40IDguMTYgMTAuMzYgNy4xMiAxMC4zNiA1Ljg0QzEwLjM2IDQuNTYgMTEuNCAzLjUyIDEyLjY4IDMuNTJDMTMuOTYgMy41MiAxNC45OSA0LjU2IDE0Ljk5IDUuODRDMTQuOTkgNy4xMiAxMy45NiA4LjE2IDEyLjY4IDguMTZaIiBmaWxsPSIjQkYzNDQ0Ii8+CjxwYXRoIGQ9Ik0xMiAyMy45NkMxMi4yMiAyMy45OSAxMi40NSAyNCAxMi42OSAyNEMxMi45MiAyNCAxMy4xNSAyMy45OSAxMy4zNyAyMy45NkMxMy4xNCAyMy45NyAxMi45MiAyMy45OCAxMi42OSAyMy45OEMxMi40NSAyMy45OCAxMi4yMyAyMy45NyAxMiAyMy45NloiIGZpbGw9IiNCRjM0NDQiLz4KPHBhdGggZD0iTTEyLjY4IDIwLjMyQzEzLjk2IDIwLjMyIDE0Ljk5IDE5LjI4IDE0Ljk5IDE4LjAxQzE0Ljk5IDE2LjczIDEzLjk2IDE1LjY5IDEyLjY4IDE1LjY5QzExLjQgMTUuNjkgMTAuMzYgMTYuNzMgMTAuMzYgMTguMDFDMTAuMzYgMTkuMjggMTEuNCAyMC4zMiAxMi42OCAyMC4zMloiIGZpbGw9IiNCRjM0NDQiLz4KPC9nPgo8ZGVmcz4KPGNsaXBQYXRoIGlkPSJjbGlwMF80Njc5XzEwNTI5ODEpIj4KPHJlY3Qgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiBmaWxsPSJ3aGl0ZSIgdHJhbnNmb3JtPSJ0cmFuc2Zvcm0oMC42OSkiLz4KPC9jbGlwUGF0aD4KPC9kZWZzPgo8L3N2Zz4K" alt="{{ c.EVENT_NAME }}" width="24" class="d-inline-block align-text-top">
+                {{ c.EVENT_NAME }}
+                {% if c.CURRENT_KIOSK_SUPERVISOR %}Volunteer Kiosk{% endif %}
+              </a>
+              <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#main-navbar-collapse" aria-controls="main-navbar-collapse" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+              </button>
+              <div class="collapse navbar-collapse" id="main-navbar-collapse">
+                {% block mainmenu %}
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0" id="main-menu">
+                    {{ macros.mainmenu(c.PAGE_PATH) }}
+                </ul>
+                {% endblock %}
+                {% block searchbox %}
+                {% if not c.PAGE_PATH.startswith('/login') and not c.CURRENT_KIOSK_SUPERVISOR and c.CURRENT_ADMIN %}
+                <form class="d-flex" role="search" method="get" action="../registration/index">
+                  <input class="form-control me-2" type="search" placeholder="Search" aria-label="Search" name="search_text" id="search_text" autofocus/>
+                  <button class="btn btn-outline-success" type="submit">Search</button>
+                </form>
+                {% endif %}
+                {% endblock %}
+                <ul class="navbar-nav mb-2 mb-lg-0">
+                  <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                      {% if c.CURRENT_ADMIN %}
+                        {{ c.CURRENT_ADMIN.description }}
+                      {% else %}
+                        Logged Out
+                      {% endif %}
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                      {% if c.CURRENT_ADMIN %}
+                        <li><a class="dropdown-item" href="../accounts/change_password">Change Password</a></li>
+                        <li><a class="dropdown-item" href="../accounts/logout">Log Out</a></li>
+                      {% else %}
+                        <li><a class="dropdown-item" href="../accounts/login">Log In</a></li>
+                      {% endif %}
+                    </ul>
+                  </li>
+                </ul>
+              </div>
+            </div>
+        </nav>
+        {% endif %}
+        {% endblock %}
+        {% block message %}
+            {{ macros.render_message(message) }}
+        {% endblock %}
+        {% block content %}
+        {% endblock %}
+    </div>
+    {% block footer_scripts %}
+    {% endblock %}
+</body>
+</html>
