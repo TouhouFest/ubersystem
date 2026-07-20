@@ -3,7 +3,7 @@ name: Lint & Type Check
 
 on:
   push:
-    branches: [touhoufest2027, main]
+    branches: [touhoufest*, main]
   pull_request:
   workflow_dispatch:
 
