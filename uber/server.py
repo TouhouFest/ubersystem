@@ -28,15 +28,14 @@ cherrypy.lib.sessions.RedisSession = RedisSession
 mimetypes.init()
 
 if c.SENTRY['enabled']:
+    sample_rate = float(c.SENTRY.get('sample_rate', 0.05))
+    traces_sample_rate = sample_rate / 100.0 if sample_rate > 1.0 else sample_rate
+
     sentry_sdk.init(
         dsn=c.SENTRY['dsn'],
         environment=c.SENTRY['environment'],
         release=c.SENTRY['release'],
-
-        # Set traces_sample_rate to 1.0 to capture 100%
-        # of transactions for performance monitoring.
-        # We recommend adjusting this value in production.
-        traces_sample_rate=c.SENTRY['sample_rate'] / 100
+        traces_sample_rate=traces_sample_rate,
     )
 
 def sentry_start_transaction():
