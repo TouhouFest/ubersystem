@@ -16,7 +16,7 @@ from cherrypy import HTTPError
 from pockets import is_listy
 from pockets.autolog import log
 
-from uber.config import c, Config
+from uber.config import c, Config, plugins_dir
 from uber.decorators import all_renderable, render
 from uber.errors import HTTPRedirect
 from uber.utils import mount_site_sections, static_overrides
@@ -264,6 +264,8 @@ log.info("Loading plugins")
 for plugin_name in c.PLUGINS:
     log.info(f"Loading plugin {plugin_name}")
     sys.path.append(f"/app/plugins/{plugin_name}")
+    sys.path.append(str(plugins_dir / plugin_name))
+    sys.path.append(str(plugins_dir))
     plugin = importlib.import_module(plugin_name)
     if callable(getattr(plugin, 'on_load', None)):
         plugin.on_load()
