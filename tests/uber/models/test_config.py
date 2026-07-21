@@ -294,3 +294,52 @@ class TestMiscConfig:
         monkeypatch.setattr(c, 'REFUND_CUTOFF', cutoff)
         monkeypatch.setattr(c, 'REFUND_START', start)
         assert c.SELF_SERVICE_REFUNDS_OPEN == expected
+
+
+class TestSingleDayPriceBumps:
+    @pytest.fixture(autouse=True)
+    def setup_single_day_pricing(self, monkeypatch):
+        now = localized_now()
+        monkeypatch.setattr(c, 'PRICE_BUMPS_ENABLED', True)
+        monkeypatch.setattr(c, 'DEFAULT_SINGLE_DAY', 40)
+        monkeypatch.setattr(c, 'BADGE_PRICES', {
+            'attendee': {},
+            'single_day': {'Saturday': 45, 'Sunday': 30},
+            'single_day_bumps': {
+                'Saturday': {now - timedelta(days=1): 55},
+                'Sunday': {now + timedelta(days=5): 40}
+            }
+        })
+        monkeypatch.setattr(c, 'SINGLE_DAY_PRICE_BUMPS', {
+            'Saturday': {now - timedelta(days=1): 55},
+            'Sunday': {now + timedelta(days=5): 40}
+        })
+        monkeypatch.setattr(c, 'SINGLE_DAY_GENERAL_BUMPS', {})
+        monkeypatch.setattr(c, 'SATURDAY_AVAILABLE', True)
+        monkeypatch.setattr(c, 'SUNDAY_AVAILABLE', True)
+        monkeypatch.setattr(c, 'SATURDAY', 101)
+        monkeypatch.setattr(c, 'SUNDAY', 102)
+        monkeypatch.setattr(c, 'BADGES', {101: 'Saturday', 102: 'Sunday'})
+
+    def test_single_day_price_bump_active(self):
+        now = localized_now()
+        assert 55 == c.get_oneday_price(dt=now, day_name='Saturday')
+
+    def test_single_day_price_bump_future(self):
+        now = localized_now()
+        assert 30 == c.get_oneday_price(dt=now, day_name='Sunday')
+
+    def test_single_day_presold_price(self):
+        now = localized_now()
+        assert 55 == c.get_presold_oneday_price(101, dt=now)
+        assert 30 == c.get_presold_oneday_price(102, dt=now)
+
+    def test_single_day_opt_returns_bumped_price(self):
+        now = localized_now()
+        opt = c.single_day_opt('Saturday', dt=now)
+        assert opt['price'] == 55
+
+    def test_price_bumps_disabled(self, monkeypatch):
+        monkeypatch.setattr(c, 'PRICE_BUMPS_ENABLED', False)
+        now = localized_now()
+        assert 45 == c.get_oneday_price(dt=now, day_name='Saturday')
