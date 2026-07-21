@@ -21,6 +21,7 @@ from pockets.autolog import log
 from pytz import UTC
 from residue import check_constraint_naming_convention, declarative_base, JSON, SessionManager, UTCDateTime, UUID
 from sqlalchemy import and_, func, or_
+from sqlalchemy.dialects import registry
 from sqlalchemy.dialects.postgresql.json import JSONB
 from sqlalchemy.event import listen
 from sqlalchemy.exc import IntegrityError, NoResultFound
@@ -650,6 +651,9 @@ from uber.models.promo_code import PromoCode, PromoCodeGroup  # noqa: E402
 from uber.models.tracking import Tracking  # noqa: E402
 
 
+registry.register("postgresql", "sqlalchemy.dialects.postgresql.psycopg", "PGDialect_psycopg")
+
+
 class Session(SessionManager):
     # This looks strange, but `sqlalchemy.create_engine` will throw an error
     # if it's passed arguments that aren't supported by the given DB engine.
@@ -661,6 +665,9 @@ class Session(SessionManager):
         ('max_overflow', c.SQLALCHEMY_MAX_OVERFLOW),
         ('pool_pre_ping', True),
         ('pool_recycle', c.SQLALCHEMY_POOL_RECYCLE)] if v > -1)
+    if "postgresql" in c.SQLALCHEMY_URL:
+        _engine_kwargs['query_cache_size'] = 1200
+        _engine_kwargs['connect_args'] = {"prepare_threshold": 1, "connect_timeout": 10}
     engine = sqlalchemy.create_engine(c.SQLALCHEMY_URL, **_engine_kwargs)
 
     @classmethod
