@@ -1089,7 +1089,7 @@ class Attendee(MagModel, TakesPaymentMixin):
     def new_badge_cost(self):
         # What this badge would cost if it were new, i.e., not taking into
         # account special overrides or upgrades
-        registered = self.registered_local if self.registered else uber.utils.localized_now()
+        registered = self.registered_local if self.registered else localized_now()
         if self.is_dealer:
             return c.DEALER_BADGE_PRICE
         elif self.badge_type == c.ONE_DAY_BADGE:
@@ -1416,7 +1416,7 @@ class Attendee(MagModel, TakesPaymentMixin):
     def cannot_self_service_refund_reason(self):
         from uber.custom_tags import datetime_local_filter
 
-        if not c.REFUND_CUTOFF:
+        if not c.REFUND_CUTOFF and not c.REFUND_WINDOW_DAYS:
             return "We do not offer refunds."
         if self.has_at_con_payments:
             return "We cannot automatically refund at-the-door payments."
@@ -1424,6 +1424,11 @@ class Attendee(MagModel, TakesPaymentMixin):
             return "Refunds are no longer available."
         if c.BEFORE_REFUND_START:
             return f"Refunds will open at {datetime_local_filter(c.REFUND_START)}."
+        if c.REFUND_WINDOW_DAYS and self.registered:
+            registered = self.registered_local if self.registered else localized_now()
+            days_since = localized_now() - registered
+            if days_since > timedelta(days=c.REFUND_WINDOW_DAYS):
+                return f"Refunds are only available for {c.REFUND_WINDOW_DAYS} days after purchase."
         if not self.active_receipt:
             return "We cannot automatically refund your payments."
         elif self.active_receipt.manual_payments or self.active_receipt.payments_on_hold:
