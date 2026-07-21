@@ -11,7 +11,7 @@ Please select a department above to view its hotel-eligible staffers.
     <br/><br/>
     {% if checklist.relevant and (c.DEPT_CHECKLIST_OPEN or c.DEV_BOX) %}
         {% if checklist.completed %}
-            You've already indicated that this list is complete; emails STOPS if you completed this in error.
+            You've already indicated that this list is complete; emails {{ c.STAFFING_DEPT_NAME }} if you completed this in error.
         {% else %}
             <a href="#" onClick="$('#complete').show(); return false;">I've reviewed this list and there's no one missing from it for my department.</a>
             <div style="display:none" id="complete">

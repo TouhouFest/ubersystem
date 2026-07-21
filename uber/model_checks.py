@@ -875,7 +875,7 @@ def allowed_to_volunteer(attendee):
 def banned_volunteer(attendee):
     if attendee.staffing_or_will_be and attendee.full_name in c.BANNED_STAFFERS:
         return ('staffing', "We've declined to invite {} back as a volunteer, ".format(attendee.full_name) + (
-                    'talk to STOPS to override if necessary' if c.AT_THE_CON else
+                    f'talk to {c.STAFFING_DEPT_NAME} to override if necessary' if c.AT_THE_CON else
                     'Please contact us via {} if you believe this is in error'.format(c.CONTACT_URL)))
 
 

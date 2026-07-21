@@ -138,7 +138,7 @@ def notify_admins_of_pending_emails():
 
         for sender, emails_by_ident in pending_emails_by_sender.items():
             if sender == c.STAFF_EMAIL:
-                # STOPS receives a report on ALL the pending emails.
+                # Staffing department receives a report on ALL the pending emails.
                 emails_by_sender = pending_emails_by_sender
             elif sender == c.CONTACT_EMAIL:
                 continue

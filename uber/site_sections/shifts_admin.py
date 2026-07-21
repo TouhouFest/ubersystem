@@ -175,7 +175,7 @@ class Root:
     @requires_shifts_admin
     def unfilled_shifts(self, session, department_id=None, message='', toggle_filter=''):
         """
-        This page is very similar to the signups view, but this is for STOPS to assign on-call
+        This page is very similar to the signups view, but this is for the staffing department to assign on-call
         volunteers to shifts onsite, so all the default values need to be the exact opposite.
 
         We also don't want the filters to interfere with the signups view so we store them separately.

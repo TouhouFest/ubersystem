@@ -361,7 +361,7 @@ class Root:
                 out.writerow([])
             out.writerow([
                 ('Locked-in ' if room.locked_in else '')
-                + 'room created by STOPS for '
+                + f'room created by {c.STAFFING_DEPT_NAME} for '
                 + room.nights_display
                 + (' ({})'.format(room.notes) if room.notes else '')])
 

@@ -15,7 +15,7 @@ Please select a department above to view its staffers.
 {% if checklist.relevant and (c.DEPT_CHECKLIST_OPEN or c.DEV_BOX) %}
     <br/>
     {% if checklist.completed %}
-        You've already indicated that this list is valid, please email STOPS if this is incorrect.
+        You've already indicated that this list is valid, please email {{ c.STAFFING_DEPT_NAME }} if this is incorrect.
     {% else %}
         <a href="#" onClick="$('#checkoff').show(); return false;">As a head of this department, this looks good to me.</a>
         <form id="checkoff" style="display:none" method="post" action="../dept_checklist/mark_item_complete">
