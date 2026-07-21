@@ -9,62 +9,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  downstream:
-    # This job reads $DOCKER_BUILDS to look for any downstream docker containers that
-    # depend on this branch and adds matrix jobs to build them in parallel.
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-      - id: set-matrix
-        run: |
-          echo "matrix={\"include\":$(echo "${{ vars.DOCKER_BUILDS }}" | yq -o=json -I 0 e '.branches.${{ github.ref_name }} // [{"name":"${{ vars.UBER_REPO || 'magfest/ubersystem' }}:${{ github.ref_name }}", "plugins":[]}]' -)}" >> $GITHUB_OUTPUT
-          cat $GITHUB_OUTPUT
-
-  build_downstream:
-    permissions:
-      contents: read
-      packages: write
-    needs: downstream
-    strategy:
-      matrix: ${{ fromJson(needs.downstream.outputs.matrix) }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v1
-
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
-
-      - name: Login to GHCR
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - run: |
-          echo -n "plugins=" >> $GITHUB_ENV
-          echo '${{ toJSON(matrix.plugins) }}' | jq -c >> $GITHUB_ENV
-          echo -n "plugin_names=" >> $GITHUB_ENV
-          echo '${{ toJSON(matrix.plugins) }}' | jq -c "[.[].name]" >> $GITHUB_ENV
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and Push Docker Image
-        uses: docker/build-push-action@v6
-        with:
-          build-args: |
-            PLUGINS=${{ env.plugins }}
-            PLUGIN_NAMES=${{ env.plugin_names }}
-          platforms: linux/amd64
-          context: "."
-          push: true
-          tags: ghcr.io/${{ matrix.name }}
-          # cache-from: type=gha
-          # cache-to: type=gha,mode=max
-
   build:
     name: Build Docker Container
     permissions:
