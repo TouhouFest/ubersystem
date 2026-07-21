@@ -1400,72 +1400,20 @@ class ExcelWorksheetStreamWriter:
             self.next_col += 1
 
 
-"""
-class OAuthRequest:
-    This class is not currently in use, but kept in case we want to re-add integration with Auth0.
-    If we need it, re-add the Authlib library so you can import OAuth2Session.
-
-    def __init__(self, scope='openid profile email', state=None):
-        self.redirect_uri = (c.REDIRECT_URL_BASE or c.URL_BASE) + "/accounts/"
-        self.client = OAuth2Session(c.AUTH_CLIENT_ID, c.AUTH_CLIENT_SECRET, scope=scope, state=state,
-                                    redirect_uri=self.redirect_uri + "process_login")
-        self.state = state if state else None
-
-    def set_auth_url(self):
-        self.auth_uri, self.state = self.client.create_authorization_url("https://{}/authorize".format(c.AUTH_DOMAIN),
-                                                                         self.state)
-
-    def set_token(self, code, state):
-        self.auth_token = self.client.fetch_token("https://{}/oauth/token".format(c.AUTH_DOMAIN),
-                                                  code=code, state=state).get('access_token')
-
-    def get_email(self):
-        profile = self.client.get("https://{}/userinfo".format(c.AUTH_DOMAIN)).json()
-        if not profile.get('email', ''):
-            log.error("Tried to authenticate a user but we couldn't retrieve their email. Did we use the right scope?")
-        else:
-            return profile['email']
-
-    @property
-    def logout_uri(self):
-        return "https://{}/v2/logout?client_id={}&returnTo={}".format(
-                    c.AUTH_DOMAIN,
-                    c.AUTH_CLIENT_ID,
-                    self.redirect_uri + "process_logout")
-"""
+from uber.signature_service import BaseSignatureRequest (Implement provider-agnostic OpenSign e-signature integration with comprehensive test suite and documentation)
 
 
-class SignNowRequest:
-    def __init__(self, session, group=None, ident='', create_if_none=False):
-        self.group = group
-        self.group_leader_name = ''
-        self.document = None
-        self.access_token = None
-        self.error_message = ''
-
-        self.set_access_token()
-        if self.error_message:
-            log.error(self.error_message)
-            return
-
-        from uber.models import SignedDocument
-
-        if group:
-            self.document = session.query(SignedDocument).filter_by(model="Group", fk_id=group.id).first()
-
-            if not self.document and create_if_none:
-                self.document = SignedDocument(fk_id=group.id, model="Group", ident=ident)
-                first_name = group.leader.first_name if group.leader else ''
-                last_name = group.leader.last_name if group.leader else ''
-                self.group_leader_name = first_name + ' ' + last_name
-
-            if self.document and not self.document.document_id:
-                self.document.document_id = self.create_document(
-                    template_id=c.SIGNNOW_DEALER_TEMPLATE_ID,
-                    doc_title="MFF {} Dealer Terms - {}".format(c.EVENT_YEAR, group.name),
-                    folder_id=c.SIGNNOW_DEALER_FOLDER_ID,
-                    uneditable_texts_list=group.signnow_texts_list,
-                    fields={} if c.SIGNNOW_ENV == 'eval' else {'printed_name': self.group_leader_name})
+class SignNowRequest(BaseSignatureRequest):
+    def _init_create_document(self, group):
+        texts = getattr(group, 'esign_texts_list', getattr(group, 'signnow_texts_list', None))
+        if hasattr(texts, '_mock_name') and hasattr(group, 'signnow_texts_list') and not hasattr(group.signnow_texts_list, '_mock_name'):
+            texts = group.signnow_texts_list
+        return self.create_document(
+            template_id=c.SIGNNOW_DEALER_TEMPLATE_ID,
+            doc_title="MFF {} Dealer Terms - {}".format(c.EVENT_YEAR, group.name),
+            folder_id=c.SIGNNOW_DEALER_FOLDER_ID,
+            uneditable_texts_list=texts,
+            fields={} if c.SIGNNOW_ENV == 'eval' else {'printed_name': self.group_leader_name})
 
     @property
     def api_call_headers(self):
@@ -1502,22 +1450,6 @@ class SignNowRequest:
 
         if self.error_message:
             log.error(self.error_message)
-
-    def invalid_request(self, msg, check_group=False):
-        if check_group:
-            if not self.group:
-                self.error_message = f"{msg} without a group attached to the request!"
-        elif not self.document:
-            self.error_message = f"{msg} without a document attached to the request!"
-        else:
-            self.check_access_token(msg)
-        return bool(self.error_message)
-
-    def check_access_token(self, msg):
-        if not self.access_token:
-            self.set_access_token()
-            if not self.access_token:
-                self.error_message = f"{msg} but access token is not set!"        
 
     def create_document(self, template_id, doc_title, folder_id='', uneditable_texts_list=None, fields={}):
         from requests import put
@@ -1585,21 +1517,6 @@ class SignNowRequest:
         details = self.get_document_details()
         if details and details.get('signatures'):
             return details['signatures'][0].get('created')
-
-    def create_dealer_signing_link(self):
-        if self.invalid_request("Tried to send a dealer signing link", check_group=True):
-            log.error(self.error_message)
-            return
-
-        first_name = self.group.leader.first_name if self.group.leader else ''
-        last_name = self.group.leader.last_name if self.group.leader else ''
-
-        if self.document.document_id and not self.document.signed:
-            link = self.get_signing_link(first_name,
-                                         last_name,
-                                         (c.REDIRECT_URL_BASE or c.URL_BASE) + '/preregistration/group_members?id={}'
-                                         .format(self.group.id))
-            return link
 
     def get_signing_link(self, first_name="", last_name="", redirect_uri=""):
         from requests import post

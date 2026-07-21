@@ -34,12 +34,12 @@
       <th>Owed</th>
       <th>Paid</th>
       <th>Admin Notes</th>
-      {% if c.SIGNNOW_DEALER_TEMPLATE_ID %}<th>Signed?</th>{% endif %}
+      {% if c.ESIGN_DEALER_TEMPLATE_ID %}<th>Signed?</th>{% endif %}
     </tr>
   </thead>
   <tbody>
 {% for group in dealer_groups %}
-    <tr{% if c.SIGNNOW_DEALER_TEMPLATE_ID and not group.signnow_document_signed or group.status in [c.DECLINED, c.CANCELLED] %} class="danger"{% endif %}>
+    <tr{% if c.ESIGN_DEALER_TEMPLATE_ID and not group.esign_document_signed or group.status in [c.DECLINED, c.CANCELLED] %} class="danger"{% endif %}>
         <td style="text-align:left" data-order="{{ group.name }}" data-search="{{ group.name }}"> 
           <a href="form?id={{ group.id }}">{{ group.name|default('?????', boolean=True) }}</a></td>
         <td>
@@ -52,7 +52,7 @@
         <td>{{ group.amount_unpaid|format_currency }}</td>
         <td>{{ (group.amount_paid / 100)|format_currency }}</td>
         <td>{{ group.admin_notes }}</td>
-        {% if c.SIGNNOW_DEALER_TEMPLATE_ID %}<td>{{ group.signnow_document_signed }}</td>{% endif %}
+        {% if c.ESIGN_DEALER_TEMPLATE_ID %}<td>{{ group.esign_document_signed }}</td>{% endif %}
     </tr>
 {% endfor %}
   </tbody>

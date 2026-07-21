@@ -19,12 +19,15 @@ from uber.decorators import ajax, ajax_gettable, all_renderable, credit_card, cs
     redirect_if_at_con_to_kiosk, render, requires_account
 from uber.errors import HTTPRedirect
 from uber.forms import load_forms
-from uber.models import Attendee, AttendeeAccount, Attraction, BadgePickupGroup, Email, Group, PromoCode, PromoCodeGroup, \
-                        ModelReceipt, ReceiptItem, ReceiptTransaction, Tracking
+from uber.models import AdminAccount, Attendee, AttendeeAccount, Attraction, BadgePickupGroup, Email, Group, PromoCode, PromoCodeGroup, \
+                        ModelReceipt, PasswordReset, ReceiptItem, ReceiptTransaction, Tracking
 from uber.tasks.email import send_email
 from uber.utils import add_opt, remove_opt, check, localized_now, normalize_email, normalize_email_legacy, genpasswd, valid_email, \
-    valid_password, SignNowRequest, validate_model, create_new_hash, get_age_conf_from_birthday, RegistrationCode
+    valid_password, SignNowRequest, validate_model, create_new_hash, get_age_conf_from_birthday, RegistrationCode, listify
+from uber.signature_service import get_esign_request
 from uber.payments import PreregCart, TransactionRequest, ReceiptManager, RefundRequest
+
+log = logging.getLogger(__name__)
 
 
 def check_if_can_reg(is_dealer_reg=False):
@@ -1257,29 +1260,29 @@ class Root:
 
         forms = load_forms(params, group, form_list)
 
-        signnow_document = None
-        signnow_link = ''
+        esign_document = None
+        esign_link = ''
 
-        if group.is_dealer and c.SIGNNOW_DEALER_TEMPLATE_ID and group.is_valid and group.status in c.DEALER_ACCEPTED_STATUSES:
-            signnow_request = SignNowRequest(session=session, group=group, ident="terms_and_conditions",
-                                             create_if_none=True)
+        if group.is_dealer and c.ESIGN_DEALER_TEMPLATE_ID and group.is_valid and group.status in c.DEALER_ACCEPTED_STATUSES:
+            esign_request = get_esign_request(session=session, group=group, ident="terms_and_conditions",
+                                              create_if_none=True)
 
-            if not signnow_request.error_message:
-                signnow_document = signnow_request.document
-                session.add(signnow_document)
+            if not esign_request.error_message:
+                esign_document = esign_request.document
+                session.add(esign_document)
 
-                signnow_link = signnow_document.link
+                esign_link = esign_document.link
 
-                if not signnow_document.signed:
-                    signed = signnow_request.get_doc_signed_timestamp()
+                if not esign_document.signed:
+                    signed = esign_request.get_doc_signed_timestamp()
                     if signed:
-                        signnow_document.signed = datetime.fromtimestamp(int(signed))
-                        signnow_link = ''
-                        signnow_document.link = signnow_link
-                    elif not signnow_link:
-                        signnow_link = signnow_request.create_dealer_signing_link()
-                        if not signnow_request.error_message:
-                            signnow_document.link = signnow_link
+                        esign_document.signed = datetime.fromtimestamp(int(signed))
+                        esign_link = ''
+                        esign_document.link = esign_link
+                    elif not esign_link:
+                        esign_link = esign_request.create_dealer_signing_link()
+                        if not esign_request.error_message:
+                            esign_document.link = esign_link
 
                 session.commit()
 
@@ -1312,28 +1315,32 @@ class Root:
                               for item in sublist],
             'homepage_account': session.get_attendee_account_by_attendee(group.leader),
             'logged_in_account': session.current_attendee_account(),
-            'signnow_document': signnow_document,
-            'signnow_link': signnow_link,
+            'esign_document': esign_document,
+            'esign_link': esign_link,
+            'signnow_document': esign_document,
+            'signnow_link': esign_link,
             'receipt': receipt,
             'incomplete_txn': receipt.get_last_incomplete_txn() if receipt else None,
             'message': message
         }
 
-    def download_signnow_document(self, session, id, return_to='../preregistration/group_members'):
+    @requires_account(Group)
+    def download_esign_document(self, session, id, return_to='../preregistration/group_members'): (Implement provider-agnostic OpenSign e-signature integration with comprehensive test suite and documentation)
         group = session.group(id)
-        signnow_request = SignNowRequest(session=session, group=group)
-        if signnow_request.error_message:
+        esign_request = get_esign_request(session=session, group=group)
+        if esign_request.error_message:
             raise HTTPRedirect(return_to + "?id={}&message={}", id,
                                "We're having an issue fetching this document link. Please try again later!")
-        elif signnow_request.document:
-            if signnow_request.document.signed:
-                download_link = signnow_request.get_download_link()
-                if not signnow_request.error_message:
+        elif esign_request.document:
+            if esign_request.document.signed:
+                download_link = esign_request.get_download_link()
+                if not esign_request.error_message:
                     raise HTTPRedirect(download_link)
             raise HTTPRedirect(return_to + "?id={}&message={}", id,
                                "We don't have a record of this document being signed.")
-        raise HTTPRedirect(return_to + "?id={}&message={}", id, "We don't have a record of a document for this group.")
+    download_signnow_document = download_esign_document
 
+    @requires_account()
     def register_group_member(self, session, group_id, message='', **params):
         group = session.group(group_id, ignore_csrf=True)
         if params.get('id') in [None, '', 'None']:

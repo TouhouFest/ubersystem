@@ -302,6 +302,14 @@ class Config(_Overridable):
     For all of the datetime config options, we also define BEFORE_ and AFTER_ properties, e.g. you can
     check the booleans returned by c.BEFORE_PLACEHOLDER_DEADLINE or c.AFTER_PLACEHOLDER_DEADLINE
     """
+    @property
+    def ESIGN_DEALER_TEMPLATE_ID(self):
+        return getattr(self, 'SIGNNOW_DEALER_TEMPLATE_ID', '') or getattr(self, 'OPENSIGN_DEALER_TEMPLATE_ID', '')
+
+    @property
+    def ESIGN_DEALER_FOLDER_ID(self):
+        return getattr(self, 'SIGNNOW_DEALER_FOLDER_ID', '') or getattr(self, 'OPENSIGN_DEALER_FOLDER_ID', '')
+
     def get_oneday_price(self, dt):
         return self.BADGE_PRICES['single_day'].get(dt.strftime('%A'), self.DEFAULT_SINGLE_DAY)
 
@@ -1585,6 +1593,7 @@ class AWSSecretFetcher:
 
     def get_all_secrets(self):
         self.get_signnow_secret()
+        self.get_opensign_secret()
 
     def get_signnow_secret(self):
         if not c.AWS_SIGNNOW_SECRET_NAME:
@@ -1595,6 +1604,15 @@ class AWSSecretFetcher:
             c.SIGNNOW_CLIENT_ID = signnow_secret.get('CLIENT_ID', '') or c.SIGNNOW_CLIENT_ID
             c.SIGNNOW_CLIENT_SECRET = signnow_secret.get('CLIENT_SECRET', '') or c.SIGNNOW_CLIENT_SECRET
             return signnow_secret
+
+    def get_opensign_secret(self):
+        if not c.AWS_OPENSIGN_SECRET_NAME:
+            return
+
+        opensign_secret = self.get_secret(c.AWS_OPENSIGN_SECRET_NAME)
+        if opensign_secret:
+            c.OPENSIGN_API_TOKEN = opensign_secret.get('API_TOKEN', '') or c.OPENSIGN_API_TOKEN
+            return opensign_secret
 
 def get_config_files(plugin_name, module_dir):
     config_files_str = os.environ.get(f"{plugin_name.upper()}_CONFIG_FILES", "")
@@ -1727,7 +1745,7 @@ def build_hotel_inventory(inventory_type, room_types):
     
 
 c = Config()
-_config = parse_config("uber", pathlib.Path("/app/uber"))  # outside this module, we use the above c global instead of using this directly
+_config = parse_config("uber", pathlib.Path(__file__).resolve().parent)  # outside this module, we use the above c global instead of using this directly
 db_connection_string = os.environ.get('DB_CONNECTION_STRING')
 
 for conf, val in _config['secret'].items():

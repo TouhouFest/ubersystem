@@ -15,19 +15,19 @@
       <a class="btn btn-info" href="../guests/index?id={{ group.guest.id }}">{{ group.guest.group_type_label }} Checklist</a>
       {% endif %}
       </div>
-      {% if signnow_signed %}
+      {% if esign_signed %}
       <div class="col text-end">
-        <em>This dealer signed their SignNow document on {{ signnow_signed|datetime_local }}.</em>
+        <em>This dealer signed their Terms & Conditions agreement on {{ esign_signed|datetime_local }}.</em>
       </div>
-      {% elif signnow_last_emailed %}
+      {% elif esign_last_emailed %}
       <div class="col text-end">
-      <em>This dealer was last emailed their SignNow document at {{ signnow_last_emailed|datetime_local }}.</em>
-      <a class="btn btn-warning" href="../dealer_admin/send_signnow_link?id={{ group.id }}">Resend SignNow Link</a>
+      <em>This dealer was last emailed their Terms & Conditions agreement at {{ esign_last_emailed|datetime_local }}.</em>
+      <a class="btn btn-warning" href="../dealer_admin/send_esign_link?id={{ group.id }}">Resend Agreement Link</a>
       </div>
-      {% elif c.SIGNNOW_DEALER_TEMPLATE_ID and group.is_dealer and group.status in c.DEALER_ACCEPTED_STATUSES %}
+      {% elif c.ESIGN_DEALER_TEMPLATE_ID and group.is_dealer and group.status in c.DEALER_ACCEPTED_STATUSES %}
       <div class="col text-end">
-      <em>This dealer has not been emailed a SignNow document yet.</em>
-      <a class="btn btn-success" href="../dealer_admin/send_signnow_link?id={{ group.id }}">Send SignNow Link</a>
+      <em>This dealer has not been emailed an e-signature link yet.</em>
+      <a class="btn btn-success" href="../dealer_admin/send_esign_link?id={{ group.id }}">Send Agreement Link</a>
       </div>
       {% endif %}
     </div>

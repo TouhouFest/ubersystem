@@ -15,6 +15,7 @@ from uber.errors import HTTPRedirect
 from uber.forms import load_forms
 from uber.models import AdminAccount, Attendee, Email, Event, Group, GuestGroup, PageViewTracking, Tracking
 from uber.utils import check, validate_model, add_opt, SignNowRequest
+from uber.signature_service import get_esign_request
 from uber.payments import ReceiptManager
 
 
@@ -118,32 +119,32 @@ class Root:
                     form['guest_group_type'].data = group.guest.group_type
             form.populate_obj(group, is_admin=True)
 
-        signnow_last_emailed = None
-        signnow_signed = False
-        if c.SIGNNOW_DEALER_TEMPLATE_ID and group.is_dealer and group.status in c.DEALER_ACCEPTED_STATUSES:
+        esign_last_emailed = None
+        esign_signed = False
+        if c.ESIGN_DEALER_TEMPLATE_ID and group.is_dealer and group.status in c.DEALER_ACCEPTED_STATUSES:
             if cherrypy.request.method == 'POST':
-                signnow_request = SignNowRequest(session=session, group=group,
-                                                 ident="terms_and_conditions", create_if_none=True)
+                esign_request = get_esign_request(session=session, group=group,
+                                                  ident="terms_and_conditions", create_if_none=True)
             else:
-                signnow_request = SignNowRequest(session=session, group=group)
+                esign_request = get_esign_request(session=session, group=group)
 
-            if not signnow_request.error_message and signnow_request.document:
-                session.add(signnow_request.document)
+            if not esign_request.error_message and esign_request.document:
+                session.add(esign_request.document)
 
-                signnow_signed = signnow_request.document.signed
-                if not signnow_signed:
-                    signnow_signed = signnow_request.get_doc_signed_timestamp()
-                    if signnow_signed:
-                        signnow_signed = datetime.fromtimestamp(int(signnow_signed))
-                        signnow_request.document.signed = signnow_signed
-                        signnow_link = ''
-                        signnow_request.document.link = signnow_link
+                esign_signed = esign_request.document.signed
+                if not esign_signed:
+                    esign_signed = esign_request.get_doc_signed_timestamp()
+                    if esign_signed:
+                        esign_signed = datetime.fromtimestamp(int(esign_signed))
+                        esign_request.document.signed = esign_signed
+                        esign_link = ''
+                        esign_request.document.link = esign_link
 
-                if not signnow_signed and not signnow_request.document.last_emailed:
-                    signnow_request.send_dealer_signing_invite()
-                    signnow_request.document.last_emailed = datetime.now(UTC)
+                if not esign_signed and not esign_request.document.last_emailed:
+                    esign_request.send_dealer_signing_invite()
+                    esign_request.document.last_emailed = datetime.now(UTC)
 
-                signnow_last_emailed = signnow_request.document.last_emailed
+                esign_last_emailed = esign_request.document.last_emailed
                 session.commit()
 
         group_info_form = forms.get('group_info', forms.get('table_info'))
@@ -233,8 +234,10 @@ class Root:
             'group': group,
             'receipt': receipt,
             'forms': forms,
-            'signnow_last_emailed': signnow_last_emailed,
-            'signnow_signed': signnow_signed,
+            'esign_last_emailed': esign_last_emailed,
+            'esign_signed': esign_signed,
+            'signnow_last_emailed': esign_last_emailed,
+            'signnow_signed': esign_signed,
             'new_dealer': new_dealer,
             'payment_enabled': True if reg_station_id else False,
         }

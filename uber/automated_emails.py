@@ -683,6 +683,24 @@ AutomatedEmailFixture(
     when=days_before(7, c.PLACEHOLDER_DEADLINE if c.PLACEHOLDER_DEADLINE else c.UBER_TAKEDOWN),
     ident='badge_confirmation_reminder_last_chance')
 
+    AutomatedEmailFixture(
+        Attendee,
+        f'Claim your badge for {c.EVENT_NAME_AND_YEAR}!',
+        'placeholders/regular.txt',
+        lambda a: a.placeholder and a.registered_local > earliest_opening_date and a.paid == c.NEED_NOT_PAY,
+        'generic_badge_confirmation_comped',
+        sender=c.CONTACT_EMAIL,
+        allow_at_the_con=True)
+
+    AutomatedEmailFixture(
+        Attendee,
+        f'Please complete your {c.EVENT_NAME_AND_YEAR} registration',
+        'placeholders/regular.txt',
+        lambda a: a.placeholder and a.registered_local > earliest_opening_date and \
+            a.paid != c.NEED_NOT_PAY and 'converted badge' not in a.admin_notes.lower(),
+        'generic_badge_confirmation',
+        sender=c.CONTACT_EMAIL,
+        allow_at_the_con=True) (Implement provider-agnostic OpenSign e-signature integration with comprehensive test suite and documentation)
 
 if c.VOLUNTEER_CHECKLIST_OPEN:
     StopsEmailFixture(
