@@ -58,7 +58,7 @@ jobs:
           build-args: |
             PLUGINS=${{ env.plugins }}
             PLUGIN_NAMES=${{ env.plugin_names }}
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           context: "."
           push: true
           tags: ghcr.io/${{ matrix.name }}
@@ -113,7 +113,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           build-args: BRANCH=${{ github.ref_name }}
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           context: "."
           push: ${{ github.event_name != 'pull_request' && github.ref_name == 'touhoufest2027' }}
           cache-from: type=gha
