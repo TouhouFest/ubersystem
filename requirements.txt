@@ -1,5 +1,6 @@
 aiohttp==3.11.11
 alembic==1.16.4
+audioop-lts==0.2.1
 authorizenet @ git+https://github.com/magfest/sdk-python.git@d8f30cff62234005d634864887604093f221b4a5
 aztec-code-generator==0.11
 bcrypt==4.3.0
