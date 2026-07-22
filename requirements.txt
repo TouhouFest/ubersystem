@@ -1,3 +1,4 @@
+aiohttp==3.11.11
 alembic==1.16.4
 authorizenet @ git+https://github.com/magfest/sdk-python.git@d8f30cff62234005d634864887604093f221b4a5
 aztec-code-generator==0.11
@@ -8,6 +9,7 @@ celery==5.5.3
 checkdigit==0.5.0
 cherrypy==18.10.0
 configobj==5.0.9
+discord.py==2.4.0
 email_validator==2.2.0
 fpdf2==2.8.3
 geopy==2.4.1
