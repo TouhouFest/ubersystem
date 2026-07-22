@@ -15,6 +15,7 @@ from sqlalchemy.orm.exc import NoResultFound
 from uber.config import c
 from uber.custom_tags import readable_join
 from uber.decorators import render
+from uber.discord import notify_near_cap
 from uber.models import (ApiJob, Attendee, AttendeeAccount, BadgeInfo, BadgePickupGroup, Email, Group, ModelReceipt,
                          ReceiptInfo, ReceiptItem, ReceiptTransaction, Session, TerminalSettlement)
 from uber.tasks.email import send_email
@@ -198,6 +199,10 @@ def check_near_cap():
                 if not session.query(Email).filter_by(subject=subject).first() and actual_badges_left <= badges_left:
                     body = render('emails/badges_sold_alert.txt', {'badges_left': actual_badges_left}, encoding=None)
                     send_email.delay(c.REPORTS_EMAIL, [c.REGDESK_EMAIL, c.ADMIN_EMAIL], subject, body, model='n/a')
+                    try:
+                        notify_near_cap(actual_badges_left)
+                    except Exception as e:
+                        log.warning(f"Failed to trigger Discord low stock alert: {e}")
 
 
 @celery.schedule(timedelta(days=1))
