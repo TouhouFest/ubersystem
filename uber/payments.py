@@ -16,6 +16,7 @@ from pockets.autolog import log
 import uber
 from uber.config import c
 from uber.custom_tags import format_currency, email_only
+from uber.discord import notify_badge_sold, notify_badge_refunded
 from uber.utils import report_critical_exception
 import uber.spin_rest_utils as spin_rest_utils
 
@@ -913,6 +914,11 @@ class RefundRequest(TransactionRequest):
                                                       method=txn.method, department=department)
             receipt_manager.update_transaction_refund(txn, txn_refund_amt)
             self.items_to_add.update(receipt_manager.items_to_add)
+
+        try:
+            notify_badge_refunded()
+        except Exception as e:
+            log.warning(f"Failed to trigger Discord refund notification: {e}")
 
     def spin_refund_cleanup(f):
         from functools import wraps
@@ -1838,12 +1844,15 @@ class ReceiptManager:
             session.commit()
 
             model = session.get_model_by_receipt(txn_receipt)
+            became_paid = False
             if isinstance(model, Attendee) and model.is_paid:
                 if model.badge_status == c.PENDING_STATUS:
                     model.badge_status = c.NEW_STATUS
                 if model.paid in [c.NOT_PAID, c.PENDING]:
                     model.paid = c.HAS_PAID
+                    became_paid = True
             if isinstance(model, Group) and model.is_paid:
+                became_paid = True
                 for attendee in model.attendees:
                     if attendee.paid == c.PAID_BY_GROUP and attendee.badge_status == c.NEW_STATUS and \
                                                             not attendee.placeholder and \
@@ -1853,6 +1862,11 @@ class ReceiptManager:
             session.add(model)
 
             session.commit()
+            if became_paid:
+                try:
+                    notify_badge_sold(model)
+                except Exception as e:
+                    log.warning(f"Failed to trigger Discord badge sold notification: {e}")
             session.check_receipt_closed(txn_receipt)
 
             session.refresh(model)
