@@ -852,7 +852,7 @@ def create_new_hash(password):
 
 def redirect_to_allowed_dept(session, department_id, page):
     error_msg = ('You have been given admin access to this page, but you are not in any departments '
-                 'that you can admin. Please contact STOPS to remedy this.')
+                 f'that you can admin. Please contact {c.STAFFING_DEPT_NAME} to remedy this.')
 
     if c.DEFAULT_DEPARTMENT_ID == -1:
         raise HTTPRedirect('../accounts/homepage?message={}', "Please add at least one department to manage staffers.")
