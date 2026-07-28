@@ -992,7 +992,7 @@ class Attendee(MagModel, TakesPaymentMixin):
 
         return [{
             'name': self.badge_type_label,
-            'desc': 'Can be upgraded to an Attendee badge later.',
+            'desc': 'Can be upgraded to a weekend Attendee badge later.',
             'value': self.badge_type
             }]
 
