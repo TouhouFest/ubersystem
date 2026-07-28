@@ -623,7 +623,7 @@ class Config(_Overridable):
         if getattr(self, day_name.upper() + '_AVAILABLE', None):
             return {
                 'name': day_name,
-                'desc': "Can be upgraded to a weekend Attendee badge later.",
+                'desc': "Can be upgraded to a weekend badge later.",
                 'value': badge,
                 'price': price,
             }
@@ -636,7 +636,7 @@ class Config(_Overridable):
             if "One Day" in self.PRESELL_ONE_DAYS:
                 badge_types.append({
                     'name': 'Single Day',
-                    'desc': "Can be upgraded to a weekend Attendee badge later.",
+                    'desc': "Can be upgraded to a weekend badge later.",
                     'value': c.ONE_DAY_BADGE,
                     'price': self.DEFAULT_SINGLE_DAY
                 })
