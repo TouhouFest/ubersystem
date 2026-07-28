@@ -96,21 +96,38 @@ class Root:
 
     @schedule_view
     def panels_json(self, session):
-        cherrypy.response.headers['Content-Type'] = 'application/json'
-        return json.dumps([
-            {
-                'name': event.name,
-                'location': event.location_name,
-                'start': event.start_time_local.strftime('%I%p %a').lstrip('0'),
-                'end': event.end_time_local.strftime('%I%p %a').lstrip('0'),
-                'start_unix': int(mktime(event.start_time.utctimetuple())),
-                'end_unix': int(mktime(event.end_time.utctimetuple())),
-                'duration': event.duration,
-                'description': event.public_description or event.description,
-                'panelists': [panelist.attendee.full_name for panelist in event.assigned_panelists]
-            }
-            for event in sorted(session.query(Event).all(), key=lambda e: [e.start_time, e.location_name])
-        ], indent=4).encode('utf-8')
+        cherrypy.response.headers["Content-Type"] = "application/json"
+        cherrypy.response.headers["Access-Control-Allow-Origin"] = "*"
+        cherrypy.response.headers["Access-Control-Allow-Headers"] = (
+            "Content-Type, Authorization, X-Requested-With"
+        )
+        return json.dumps(
+            [
+                {
+                    "id": str(event.id),
+                    "name": event.name,
+                    "location": event.location_name,
+                    "start": event.start_time_local.strftime("%I%p %a").lstrip("0"),
+                    "end": event.end_time_local.strftime("%I%p %a").lstrip("0"),
+                    "start_unix": int(mktime(event.start_time.utctimetuple())),
+                    "end_unix": int(mktime(event.end_time.utctimetuple())),
+                    "duration": event.duration,
+                    "description": event.public_description or event.description,
+                    "panelists": [
+                        panelist.attendee.full_name
+                        for panelist in event.assigned_panelists
+                    ],
+                    "rating": event.rating_label,
+                    "content": event.content_labels,
+                    "tracks": event.tracks_labels,
+                }
+                for event in sorted(
+                    session.query(Event).all(),
+                    key=lambda e: [e.start_time, e.location_name],
+                )
+            ],
+            indent=4,
+        ).encode("utf-8")
 
     @schedule_view
     def now(self, session, when=None):

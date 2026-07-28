@@ -740,8 +740,20 @@ def schedule_view(func):
     @wraps(func)
     def with_check(*args, **kwargs):
         if c.HIDE_SCHEDULE and not c.HAS_READ_ACCESS:
-            return "The {} schedule is being developed and will be made public " \
-                   "when it's closer to being finalized.".format(c.EVENT_NAME)
+            if func.__name__.endswith("_json"):
+                cherrypy.response.headers["Content-Type"] = "application/json"
+                cherrypy.response.headers["Access-Control-Allow-Origin"] = "*"
+                return json.dumps(
+                    {
+                        "error": f"The {c.EVENT_NAME} schedule is being developed and will be made public "
+                        "when it's closer to being finalized.",
+                        "events": [],
+                    }
+                ).encode("utf-8")
+            return (
+                f"The {c.EVENT_NAME} schedule is being developed and will be made public "
+                "when it's closer to being finalized."
+            )
         return func(*args, **kwargs)
     return with_check
 
