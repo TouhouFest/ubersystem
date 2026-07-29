@@ -791,7 +791,7 @@ def single_day_prices():
     prices = ''
     if 'single_day' in c.BADGE_PRICES and isinstance(c.BADGE_PRICES['single_day'], dict):
         for day in c.BADGE_PRICES['single_day']:
-            if not isinstance(day, str) or '-' in day or not day.capitalize() in (c.DAYS_OF_WEEK or ['Friday', 'Saturday', 'Sunday', 'Thursday', 'Monday']):
+            if not isinstance(day, str) or '-' in day or day.capitalize() not in c.DAYS_OF_WEEK:
                 continue
             price = c.get_oneday_price(day_name=day)
             if day == datetime.strftime(c.ESCHATON, "%A"):
