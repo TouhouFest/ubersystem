@@ -1,0 +1,18 @@
+<div class="row" style="justify-content: center;">
+    <div class="text-center col-9" style="display: flex; align-items: center; justify-content: space-around;">
+        <a class="btn" href="form">Add Another Registration +</a>
+        <span>or</span>
+        {% if cart.total_cost > 0 %}
+            {% if c.AT_THE_CON and c.SPIN_TERMINAL_AUTH_KEY %}
+                <a href="at_door_confirmation" class="btn btn-success">Confirm Registrations and Get Check-in Barcode</a>
+            {% else %}
+                {% if c.ONLINE_PAYMENT_AVAILABLE %}{{ stripe_form('prereg_payment', text="Pay with Card Now") }}{% endif %}
+                {% if c.AT_THE_CON %}
+                <a href="at_door_confirmation" class="btn btn-success">Pay with Cash/Card at Desk</a>
+                {% endif %}
+            {% endif %}
+        {% else %}
+            <a href="process_free_prereg">{{ macros.stripe_button("Complete Registration!") }}</a>
+        {% endif %}
+    </div>
+</div>
