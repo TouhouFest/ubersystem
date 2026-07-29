@@ -302,7 +302,7 @@ class Config(_Overridable):
     For all of the datetime config options, we also define BEFORE_ and AFTER_ properties, e.g. you can
     check the booleans returned by c.BEFORE_PLACEHOLDER_DEADLINE or c.AFTER_PLACEHOLDER_DEADLINE
     """
-    def get_oneday_price(self, dt: datetime = None, day_name: str = None):
+    def get_oneday_price(self, dt: datetime | None = None, day_name: str | None = None):
         dt = dt or uber.utils.localized_now()
         if day_name is None and hasattr(dt, 'strftime'):
             day_name = dt.strftime('%A')
