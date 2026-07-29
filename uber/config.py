@@ -302,9 +302,8 @@ class Config(_Overridable):
     For all of the datetime config options, we also define BEFORE_ and AFTER_ properties, e.g. you can
     check the booleans returned by c.BEFORE_PLACEHOLDER_DEADLINE or c.AFTER_PLACEHOLDER_DEADLINE
     """
-    def get_oneday_price(self, dt=None, day_name=None):
-        if dt is None:
-            dt = uber.utils.localized_now()
+    def get_oneday_price(self, dt: datetime = None, day_name: str = None):
+        dt = dt or uber.utils.localized_now()
         if day_name is None and hasattr(dt, 'strftime'):
             day_name = dt.strftime('%A')
 
@@ -317,20 +316,19 @@ class Config(_Overridable):
             check_dt = dt or localized_now
 
             # Day-specific date price bumps (e.g. Saturday)
-            if day_name and hasattr(self, 'SINGLE_DAY_PRICE_BUMPS') and day_name in self.SINGLE_DAY_PRICE_BUMPS:
+            if day_name and day_name in self.SINGLE_DAY_PRICE_BUMPS:
                 for bump_date, bumped_price in sorted(self.SINGLE_DAY_PRICE_BUMPS[day_name].items()):
                     if check_dt >= bump_date:
                         price = bumped_price
 
             # General single-day date price bumps
-            if hasattr(self, 'SINGLE_DAY_GENERAL_BUMPS'):
-                for bump_date, bumped_price in sorted(self.SINGLE_DAY_GENERAL_BUMPS.items()):
-                    if check_dt >= bump_date:
-                        price = bumped_price
+            for bump_date, bumped_price in sorted(self.SINGLE_DAY_GENERAL_BUMPS.items()):
+                if check_dt >= bump_date:
+                    price = bumped_price
 
         return price
 
-    def get_presold_oneday_price(self, badge_type, dt=None):
+    def get_presold_oneday_price(self, badge_type: str, dt: datetime = None):
         day_name = self.BADGES.get(badge_type)
         if day_name:
             return self.get_oneday_price(dt=dt, day_name=day_name)

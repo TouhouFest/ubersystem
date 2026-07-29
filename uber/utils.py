@@ -248,14 +248,14 @@ def normalize_phone(phone_number, country='US'):
 # Datetime functions
 # ======================================================================
 
-def localized_now():
+def localized_now() -> datetime:
     """
     Returns datetime.now() but localized to the event's timezone.
     """
     return localize_datetime(datetime.utcnow())
 
 
-def localize_datetime(dt):
+def localize_datetime(dt: datetime) -> datetime:
     """
     Converts `dt` to the event's timezone.
     """
