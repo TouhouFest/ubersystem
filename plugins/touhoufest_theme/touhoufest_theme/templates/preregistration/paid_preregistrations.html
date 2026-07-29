@@ -1,0 +1,79 @@
+{% extends "./preregistration/preregbase.html" %}
+{% set title_text = "Registration Step 4 of 4: Preregistration Successful" %}
+{% block content %}
+
+<div class="card">
+  <div class="card-body">
+    {{ macros.prereg_wizard(c.PAGE_PATH, is_prereg_dealer) }}
+
+    <div class="row" style='align-items: center;'>
+      <div class="col-8">
+        <h2>Registration Complete</h2>
+        <p>
+            Congratulations! Your registration was successful.
+        </p>
+        {% if total_cost|int > 0 %}
+            <p>
+                Your credit card was successfully charged for
+                <strong>{{ total_cost|format_currency }}</strong>, and you will receive a confirmation
+                email sent to you shortly. If you paid for other registrations, those
+                attendees will get their own confirmation email.
+            </p>
+        {% else %}
+            <p>
+                You will receive a confirmation email shortly.
+                {% if preregs|length > 1 %}All attendees will get their own confirmation email.{% endif %}
+            </p>
+        {% endif %}
+
+        <p>You can view your registrations below:</p>
+      </div>
+      <div class="col-4">
+        <img class='img-fluid' src='/static/theme/reimu.webp'>
+      </div>
+    </div>
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th scope="col">Name</th>
+          <th scope="col"></th>
+        </tr>
+      </thead>
+      {% for prereg in preregs %}
+        {% if prereg.first_name %}
+          <tr>
+            <td>{{ prereg.full_name }}</td>
+            <td class="d-flex gap-2">
+              <a href="../preregistration/confirm?id={{ prereg.id }}" class="btn btn-outline-secondary" target="_blank">
+                <i class="fa fa-user"></i> View Registration
+              </a>
+              {% if c.HOTEL_LOTTERY_OPEN %}
+                <a href="../hotel_lottery/start?attendee_id={{ prereg.id }}" class="btn btn-outline-primary" target="_blank">
+                  <i class="fa fa-hotel"></i> Enter Hotel Lottery
+                </a>
+              {% endif %}
+            </td>
+          </tr>
+        {% else %}
+          <tr>
+            <td>{{ prereg.name }}</td>
+            <td colspan="3">(<a href="group_members?id={{ prereg.id }}" target="_blank">Click Here</a> to assign your group's badges)</td>
+          </tr>
+        {% endif %}
+      {% endfor %}
+    </table>
+
+    <p>
+      <strong>If you are on a shared computer, we strongly recommend logging out using the button below.</strong>
+      This will remove the record (browser cookie) that stores the above registrations, protecting your personal 
+      information. All other cookie(s), which are purely functional, have already been cleared.
+    </p>
+
+    <div style='display: flex; justify-content: space-between;'>
+      <a href="../preregistration/form" class="btn">Add Another Registration</a>
+      <a href="../landing/index?clear_cookies=true" class="btn btn-danger">Log Out</a>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
