@@ -44,6 +44,7 @@
     --tf-danger: #ff4949;
     --tf-shadow: 0 4px 12px rgba(47, 41, 61, 0.08);
     --tf-pink: #ffe1e1;
+    --tf-gray: #CBCBD2;
 }
 
 .table tbody {
@@ -179,7 +180,7 @@ h1, h2, h3, h4, h5, h6, .masthead h1, .step-title, .page-header {
 
 .bs-wizard > .bs-wizard-step > .progress {
     height: 6px !important;
-    background-color: #cbcbd2 !important;
+    background-color: var(--tf-gray) !important;
     box-shadow: none !important;
     margin: 27px 0 !important;
     border-radius: 3px !important;
@@ -349,7 +350,7 @@ input[type="email"],
 input[type="password"],
 select,
 textarea {
-    background-color: #ffffff !important;
+    background-color: #ffffff;
     border-bottom: 3px solid var(--tf-red);
     border-radius: var(--tf-border-radius) !important;
     padding: 10px 14px !important;
@@ -367,6 +368,10 @@ textarea {
     outline: 0 !important;
     box-shadow: 0 0 0 3px rgba(191, 52, 68, 0.25) !important;
     background-color: #ffffff !important;
+}
+
+.form-control:disabled {
+    background-color: var(--tf-gray);
 }
 
 .help-block, .form-text, .text-muted {
