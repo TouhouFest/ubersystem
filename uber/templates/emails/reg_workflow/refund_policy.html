@@ -17,6 +17,6 @@
 {% endif %}
   {% if c.REFUND_START %}from {{ c.REFUND_START|datetime_local }}{% endif %} until {{ c.REFUND_CUTOFF|datetime_local }}
   {% if c.REFUND_WINDOW_DAYS %}
-    within {{ c.REFUND_WINDOW_DAYS }} days of purchase
+    or within {{ c.REFUND_WINDOW_DAYS }} days of purchase, whichever comes first,
   {% endif %}
   using <a href="{{ c.URL_BASE }}/preregistration/confirm?id={{ attendee.id }}">this{% if not attendee.is_transferable %} personalized{% endif %} link</a>.
