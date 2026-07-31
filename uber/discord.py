@@ -10,13 +10,13 @@ log = logging.getLogger(__name__)
 
 _loop = None
 _webhook = None
-_init_event = threading.Event()
 _url = getattr(c, 'DISCORD_BADGE_SOLD_WEBHOOK_URL', '')
 if _url:
+    _init_event = threading.Event()
     async def _init_webhook():
         global _webhook
-        _session = aiohttp.ClientSession()
-        _webhook = Webhook.from_url(_url, session=_session)
+        session = aiohttp.ClientSession()
+        _webhook = Webhook.from_url(_url, session=session)
 
     def _start_loop():
         global _loop, _init_event
