@@ -10,19 +10,25 @@ log = logging.getLogger(__name__)
 
 _loop = None
 _webhook = None
+_init_event = threading.Event()
 _url = getattr(c, 'DISCORD_BADGE_SOLD_WEBHOOK_URL', '')
 if _url:
-    def _start_loop():
-        global _loop, _webhook
-        _loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(_loop)
+    async def _init_webhook():
+        global _webhook
         _session = aiohttp.ClientSession()
         _webhook = Webhook.from_url(_url, session=_session)
+
+    def _start_loop():
+        global _loop, _init_event
+        _loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(_loop)
+        _loop.run_until_complete(_init_webhook())
+        _init_event.set()
         _loop.run_forever()
 
     _thread = threading.Thread(target=_start_loop, daemon=True)
     _thread.start()
-
+    _init_event.wait()
 
 async def _send(content: str):
     try:
@@ -33,6 +39,7 @@ async def _send(content: str):
 
 def send_discord_webhook(content: str):
     if not _webhook:
+        log.warning(f"Could not send Discord notification without configured Discord webhook")
         return
     asyncio.run_coroutine_threadsafe(_send(content), _loop)
 
