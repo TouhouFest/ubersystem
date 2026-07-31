@@ -23,7 +23,7 @@
   </li>
   <li>
     Attendees (including {{ c.DEALER_TERM }}s) must abide by our
-    <a href="http://super.magfest.org/codeofconduct" target="_blank">code of conduct</a>.
+    {% if c.CODE_OF_CONDUCT_URL %}<a href="{{ c.CODE_OF_CONDUCT_URL }}" target="_blank">code of conduct</a>{% else %}code of conduct{% endif %}.
   </li>
   {% if c.CONSENT_FORM_URL %}
     <li>
