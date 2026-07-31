@@ -3,7 +3,7 @@
 <ul>
   <li>
     Please review our badge policies and other
-    <a href="http://super.magfest.org/faq" target="_blank">frequently asked questions</a>
+    {% if c.PREREG_FAQ_URL %}<a href="{{ c.PREREG_FAQ_URL }}" target="_blank">frequently asked questions</a>{% else %}frequently asked questions{% endif %}
     prior to purchasing your badge for important information.
   </li>
   <li>
@@ -11,11 +11,17 @@
     have to pay full price at the door.
   </li>
   <li>
-    {{ c.EVENT_NAME }} has a <a href="https://super.magfest.org/faq/#badge-refunds" target="_blank">limited refund policy</a>
-    but you may <a href="https://super.magfest.org/faq/#sell-or-transfer" target="_blank">sell/transfer your badge</a>.
+    {{ c.EVENT_NAME }} has a
+    {% if c.REFUND_POLICY_URL %}<a href="{{ c.REFUND_POLICY_URL }}" target="_blank">limited refund policy</a>
+    {% elif c.PREREG_FAQ_URL %}<a href="{{ c.PREREG_FAQ_URL }}/#badge-refunds" target="_blank">limited refund policy</a>
+    {% else %}limited refund policy{% endif %}
+    but you may
+    {% if c.PREREG_FAQ_URL %}<a href="{{ c.PREREG_FAQ_URL }}/#sell-or-transfer" target="_blank">sell/transfer your badge</a>
+    {% else %}sell/transfer your badge{% endif %}.
   </li>
   <li>
-    {{ c.EVENT_NAME }} has a <a href="https://super.magfest.org/faq/#multiple-badges" target="_blank">one badge per person policy</a>.
+    {{ c.EVENT_NAME }} has a
+    {% if c.PREREG_FAQ_URL %}<a href="{{ c.PREREG_FAQ_URL }}/#multiple-badges" target="_blank">one badge per person policy</a>{% else %}one badge per person policy{% endif %}.
     If you purchase multiple badges (for your family, as a gift), please
     ensure that each badge is purchased in the name of the individual who the
     badge is intended for. You may use the same email address for multiple
