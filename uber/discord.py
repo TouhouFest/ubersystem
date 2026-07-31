@@ -19,7 +19,7 @@ if _url:
         _webhook = Webhook.from_url(_url, session=session)
 
     def _start_loop():
-        global _loop, _init_event
+        global _loop
         _loop = asyncio.new_event_loop()
         asyncio.set_event_loop(_loop)
         _loop.run_until_complete(_init_webhook())
@@ -39,7 +39,7 @@ async def _send(content: str):
 
 def send_discord_webhook(content: str):
     if not _webhook:
-        log.warning(f"Could not send Discord notification without configured Discord webhook")
+        log.warning("Could not send Discord notification without configured Discord webhook")
         return
     asyncio.run_coroutine_threadsafe(_send(content), _loop)
 
