@@ -274,7 +274,12 @@ class PreregCart:
     
     def prereg_cart_checks(self, session):
         # Runs validations that take into account the entire prereg cart
-        adults_in_cart = [attendee for attendee in self.attendees if attendee.age_now_or_at_con >= 17]
+        adults_in_cart = [
+            attendee for attendee in self.attendees
+            if c.COLLECT_EXACT_BIRTHDATE and attendee.age_now_or_at_con >= 17
+            or not c.COLLECT_EXACT_BIRTHDATE
+            and attendee.age_group == getattr(c, '18_UP')
+        ]
         self.used_promo_codes = defaultdict(int)
 
         for attendee in self.attendees:
