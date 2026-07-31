@@ -20,4 +20,3 @@
     within {{ c.REFUND_WINDOW_DAYS }} days of purchase
   {% endif %}
   using <a href="{{ c.URL_BASE }}/preregistration/confirm?id={{ attendee.id }}">this{% if not attendee.is_transferable %} personalized{% endif %} link</a>.
-{% endif %}
