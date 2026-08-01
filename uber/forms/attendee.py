@@ -1,25 +1,38 @@
-import cherrypy
-from datetime import date
-
 from markupsafe import Markup
-from wtforms import (BooleanField, DateField, EmailField,
-                     HiddenField, SelectField, SelectMultipleField, IntegerField,
-                     StringField, TelField, SearchField, TextAreaField)
-from wtforms.widgets import TextInput
+from wtforms import (
+    BooleanField,
+    EmailField,
+    HiddenField,
+    IntegerField,
+    SelectField,
+    SelectMultipleField,
+    StringField,
+    TelField,
+    TextAreaField,
+)
 
 from uber.config import c
-from uber.forms import (AddressForm, MultiCheckbox, MagForm, SelectAvailableField, SwitchInput, NumberInputGroup,
-                        HiddenBoolField, HiddenIntField, BlankOrIntegerField, DateMaskInput, SelectBooleanField)
 from uber.custom_tags import popup_link
-from uber.badge_funcs import get_real_badge_type
-from uber.models import Attendee, BadgeInfo, Session, PromoCodeGroup
-from uber.model_checks import invalid_phone_number
-from uber.utils import get_age_conf_from_birthday
+from uber.forms import (
+    AddressForm,
+    BlankOrIntegerField,
+    DateMaskInput,
+    HiddenBoolField,
+    HiddenIntField,
+    MagForm,
+    MultiCheckbox,
+    MultiCheckboxWithTooltip,
+    NumberInputGroup,
+    SelectAvailableField,
+    SelectBooleanField,
+    SwitchInput,
+)
+from uber.models import Session
 
-
-__all__ = ['AdminBadgeExtras', 'AdminBadgeFlags', 'AdminConsents', 'AdminStaffingInfo', 'BadgeExtras',
-           'BadgeFlags', 'BadgeAdminNotes', 'PersonalInfo', 'PreregOtherInfo', 'OtherInfo', 'StaffingInfo',
-           'Consents', 'CheckInForm', 'DietaryRestrictions']
+__all__ = ['AdminBadgeExtras', 'AdminBadgeFlags', 'AdminConsents',
+           'AdminStaffingInfo', 'BadgeAdminNotes', 'BadgeExtras', 'BadgeFlags',
+           'CheckInForm', 'Consents', 'DietaryRestrictions', 'OtherInfo',
+           'PersonalInfo', 'PreregOtherInfo', 'StaffingInfo']
 
 
 class PersonalInfo(AddressForm):
@@ -174,12 +187,17 @@ class AdminStaffingInfo(StaffingInfo):
 
 
 class PreregOtherInfo(OtherInfo, StaffingInfo):
-    dynamic_choices_fields = {'requested_depts_ids': lambda: [(v[0], v[1]) for v in c.PUBLIC_DEPARTMENT_OPTS_WITH_DESC]}
+    # The way you apparently work around this is to declare this as
+    # "indeed a class variable", but this causes conflicts with the field
+    # already in StaffingInfo and also simply isn't how WTForms works.
+    dynamic_choices_fields = {'requested_depts_ids': lambda: [  # noqa: RUF012
+        (v[0], (v[1], v[2])) for v in c.PUBLIC_DEPARTMENT_OPTS_WITH_DESC
+    ]}
 
     staffing = BooleanField('I am interested in volunteering!', widget=SwitchInput(),
                             description=popup_link(c.VOLUNTEER_PERKS_URL, "What do I get for volunteering?"))
     requested_depts_ids = SelectMultipleField('Where do you want to help?',
-                                              widget=MultiCheckbox())  # TODO: Show attendees department descriptions
+                                              widget=MultiCheckboxWithTooltip())
     cellphone = TelField('Phone Number', description="A cellphone number is required for volunteers.", 
         render_kw={'placeholder': 'A phone number we can use to contact you during the event'})
     no_cellphone = BooleanField('I won\'t have a phone with me during the event.')

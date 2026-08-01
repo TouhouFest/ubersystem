@@ -32,7 +32,32 @@ class MultiCheckbox():
         return Markup(''.join(html))
 
 
-class IntSelect():
+class MultiCheckboxWithTooltip:
+    """
+    Variant of MultiCheckbox that adds a tooltip, such as for volunteer
+    department descriptions.
+    """
+    def __call__(self, field, choices=None, **kwargs):
+        choices = choices or field.choices
+        field.choices = choices
+
+        kwargs.setdefault('type', 'checkbox')
+        field_id = kwargs.pop('id', field.id)
+        html = []
+        for value, (label, desc), checked, _html_attribs in field.iter_choices():
+            choice_id = f'{field_id}-{value}'
+            options = dict(kwargs, name=field.name, value=value, id=choice_id)
+            if 'readonly' in options:
+                options['disabled'] = True
+            if checked:
+                options['checked'] = 'checked'
+            html.append(f'<label for="{choice_id}" class="checkbox-label">')
+            html.append(f'<input {html_params(**options)} /> ')
+            html.append(f'{label} <a href="#" class="ms-2" style="text-decoration: none;" data-bs-toggle="tooltip" title="{desc}">🛈</a></label>')
+        return Markup(''.join(html) + '''<script>var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {return new bootstrap.Tooltip(tooltipTriggerEl)})</script>''')
+
+
+class IntSelect:
     """
     Renders an Integer or Decimal field as a select dropdown, e.g., the "badges" dropdown for groups.
     The list of choices can be provided on init or during render and should be a list of (value, label) tuples.
