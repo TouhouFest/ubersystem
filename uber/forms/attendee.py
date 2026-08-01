@@ -8,7 +8,7 @@ from wtforms import (BooleanField, DateField, EmailField,
 from wtforms.widgets import TextInput
 
 from uber.config import c
-from uber.forms import (AddressForm, MultiCheckbox, MagForm, SelectAvailableField, SwitchInput, NumberInputGroup,
+from uber.forms import (AddressForm, MultiCheckbox, MultiCheckboxWithTooltip, MagForm, SelectAvailableField, SwitchInput, NumberInputGroup,
                         HiddenBoolField, HiddenIntField, BlankOrIntegerField, DateMaskInput, SelectBooleanField)
 from uber.custom_tags import popup_link
 from uber.badge_funcs import get_real_badge_type
@@ -174,12 +174,12 @@ class AdminStaffingInfo(StaffingInfo):
 
 
 class PreregOtherInfo(OtherInfo, StaffingInfo):
-    dynamic_choices_fields = {'requested_depts_ids': lambda: [(v[0], v[1]) for v in c.PUBLIC_DEPARTMENT_OPTS_WITH_DESC]}
+    dynamic_choices_fields = {'requested_depts_ids': lambda: [(v[0], (v[1], v[2])) for v in c.PUBLIC_DEPARTMENT_OPTS_WITH_DESC]}
 
     staffing = BooleanField('I am interested in volunteering!', widget=SwitchInput(),
                             description=popup_link(c.VOLUNTEER_PERKS_URL, "What do I get for volunteering?"))
     requested_depts_ids = SelectMultipleField('Where do you want to help?',
-                                              widget=MultiCheckbox())  # TODO: Show attendees department descriptions
+                                              widget=MultiCheckboxWithTooltip())
     cellphone = TelField('Phone Number', description="A cellphone number is required for volunteers.", 
         render_kw={'placeholder': 'A phone number we can use to contact you during the event'})
     no_cellphone = BooleanField('I won\'t have a phone with me during the event.')
