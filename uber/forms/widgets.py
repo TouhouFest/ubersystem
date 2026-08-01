@@ -57,7 +57,7 @@ class MultiCheckboxWithTooltip:
         return Markup(''.join(html) + '''<script>var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {return new bootstrap.Tooltip(tooltipTriggerEl)})</script>''')
 
 
-class IntSelect():
+class IntSelect:
     """
     Renders an Integer or Decimal field as a select dropdown, e.g., the "badges" dropdown for groups.
     The list of choices can be provided on init or during render and should be a list of (value, label) tuples.
