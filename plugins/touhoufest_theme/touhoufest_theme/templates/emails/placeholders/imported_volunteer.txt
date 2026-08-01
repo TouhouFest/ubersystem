@@ -1,0 +1,11 @@
+{% if attendee.first_name %}{{ attendee.first_name }},
+
+{% endif %}Hey all! We’re so excited to see you at {{ c.EVENT_NAME_AND_YEAR }}! We're beginning the process of preparing for the next {{ c.EVENT_NAME }} and need to know if you'll be making it to next year's event and will continue volunteering/staffing.
+
+To confirm that you'll be attending next year's {{ c.EVENT_NAME }} and will be working the event, please accept your badge by visiting {{ c.URL_BASE }}/preregistration/confirm?id={{ attendee.id }}. If you are unable to attend next year's {{ c.EVENT_NAME }} or are no longer interested in volunteering/staffing, you can email {{ c.STAFFING_DEPT_NAME }} at {{ c.STAFF_EMAIL|email_only }} to let us know.
+
+You will be emailed when the Volunteer Checklist launches. The Checklist will need to be completed before the event starts, and will have a link to our volunteering guidelines and agreement.
+
+Please let us know if you have any questions.
+
+{{ email_signature }}
