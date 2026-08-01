@@ -40,16 +40,16 @@ class PersonalInfo(AddressForm):
     last_name = StringField('Last Name', render_kw={'autocomplete': "lname"})
     same_legal_name = BooleanField('The above name is exactly what appears on my Legal Photo ID.')
     legal_name = StringField('Name as appears on Legal Photo ID',
-                             render_kw={'placeholder': 'First and last name exactly as they appear on Photo ID'})
+                             render_kw={'placeholder': 'Exact name on Photo ID'})
     badge_printed_name = StringField('Name Printed on Badge', description="Badge names have a maximum of 20 characters.")
     email = EmailField('Email Address', render_kw={'placeholder': 'test@example.com'})
     confirm_email = EmailField('Confirm Email Address')
-    cellphone = TelField('Phone Number', render_kw={'placeholder': 'A phone number we can use to contact you during the event'})
+    cellphone = TelField('Phone Number', render_kw={'placeholder': 'For contact during event'})
     birthdate = StringField('Date of Birth', widget=DateMaskInput())
     age_group = SelectField('Age Group', choices=c.AGE_GROUP_OPTS)
     ec_name = StringField('Emergency Contact Name',
-                          render_kw={'placeholder': 'Who we should contact if something happens to you'})
-    ec_phone = TelField('Emergency Contact Phone', render_kw={'placeholder': 'A valid phone number for your emergency contact'})
+                          render_kw={'placeholder': 'Person to contact for emergencies'})
+    ec_phone = TelField('Emergency Contact Phone', render_kw={'placeholder': 'Valid number for emergency contact'})
     onsite_contact = TextAreaField('Onsite Contact',
                                    render_kw={'placeholder': 'Contact info for a trusted friend or friends who will be at or near the venue '
                                               'during the event'})
