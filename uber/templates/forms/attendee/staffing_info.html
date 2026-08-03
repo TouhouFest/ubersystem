@@ -18,9 +18,9 @@ Use these to add or rearrange fields. Remember to use {{ super() }} to print the
 {% set staffing_message = "" %}
 {% if not admin_area %}
     {% if attendee.badge_type in [c.CONTRACTOR_BADGE, c.STAFF_BADGE] %}
-    {% set staffing_message = "This checkbox is required for Contractors, Volunteers, and Staff. Please contact Staffing Operations if you wish to change your status." %}
+    {% set staffing_message = "This checkbox is required for Contractors, Volunteers, and Staff. Please contact " ~ c.STAFFING_DEPT_NAME ~ " if you wish to change your status." %}
     {% elif attendee.shifts %}
-    {% set staffing_message = "Please " ~ 'see Staffing Operations to change your volunteer status.' if c.AT_THE_CON else 'unassign yourself from shifts before changing your volunteer status.' %}
+    {% set staffing_message = "Please " ~ ('see ' ~ c.STAFFING_DEPT_NAME ~ ' to change your volunteer status.' if c.AT_THE_CON else 'unassign yourself from shifts before changing your volunteer status.') %}
     {% endif %}
 {% endif %}
 {% if staffing_message != '' %}<input type="hidden" name="{{ staffing_info.staffing.name }}" value="1">{% endif %}
