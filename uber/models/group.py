@@ -118,9 +118,9 @@ class Group(MagModel, TakesPaymentMixin):
         return self.cost * 100
 
     @property
-    def signnow_texts_list(self):
+    def esign_texts_list(self):
         """
-        Returns a list of JSON representing uneditable texts fields to use for this group's document in SignNow.
+        Returns a list of JSON representing uneditable texts fields to use for this group's document in an e-signature provider.
         """
         page_number = 2
         textFont = 'Arial'
@@ -144,10 +144,13 @@ class Group(MagModel, TakesPaymentMixin):
 
         return texts
 
+    signnow_texts_list = esign_texts_list
+
     @property
-    def signnow_document_signed(self):
+    def esign_document_signed(self):
         return self.terms_conditions_doc and self.terms_conditions_doc.signed
 
+    signnow_document_signed = esign_document_signed
     def convert_to_shared(self, session):
         self.tables = 0
         if len(self.floating) < abs(1 - self.badges):
