@@ -563,6 +563,11 @@ class Config(_Overridable):
     @property
     def PREREG_BADGE_TYPES(self):
         types = [self.ATTENDEE_BADGE, self.PSEUDO_DEALER_BADGE]
+        if self.ONE_DAYS_ENABLED:
+            if self.PRESELL_ONE_DAYS:
+                types.extend([opt['value'] for opt in self.build_presold_one_days()])
+            elif c.AT_THE_CON and self.ONE_DAY_BADGE_AVAILABLE:
+                types.append(self.ONE_DAY_BADGE)
         if c.UNDER_13 in c.AGE_GROUP_CONFIGS and c.AGE_GROUP_CONFIGS[c.UNDER_13]['can_register']:
             types.append(self.CHILD_BADGE)
         for reg_open, badge_type in [(self.BEFORE_GROUP_PREREG_TAKEDOWN, self.PSEUDO_GROUP_BADGE)]:
@@ -617,11 +622,11 @@ class Config(_Overridable):
         badge = getattr(self, day_name.upper())
         if getattr(self, day_name.upper() + '_AVAILABLE', None):
             return {
-                        'name': day_name,
-                        'desc': "Can be upgraded to an Attendee badge later.",
-                        'value': badge,
-                        'price': price,
-                    }
+                'name': day_name,
+                'desc': "Can be upgraded to a weekend badge later.",
+                'value': badge,
+                'price': price,
+            }
         
     @request_cached_property
     @dynamic
@@ -631,7 +636,7 @@ class Config(_Overridable):
             if "One Day" in self.PRESELL_ONE_DAYS:
                 badge_types.append({
                     'name': 'Single Day',
-                    'desc': "Can be upgraded to an Attendee badge later.",
+                    'desc': "Can be upgraded to a weekend badge later.",
                     'value': c.ONE_DAY_BADGE,
                     'price': self.DEFAULT_SINGLE_DAY
                 })
@@ -659,7 +664,7 @@ class Config(_Overridable):
             elif self.ONE_DAY_BADGE_AVAILABLE:
                 badge_types.append({
                     'name': 'Single Day',
-                    'desc': 'Can be upgraded to an Attendee badge later.',
+                    'desc': 'Can be upgraded to a weekend badge later.',
                     'value': c.ONE_DAY_BADGE,
                     'price': c.ONEDAY_BADGE_PRICE
                 })
