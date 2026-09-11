@@ -789,12 +789,16 @@ def organization_with_event_name(separator='and'):
 @JinjaEnv.jinja_export
 def single_day_prices():
     prices = ''
-    for day, price in c.BADGE_PRICES['single_day'].items():
-        if day == datetime.strftime(c.ESCHATON, "%A"):
-            prices += 'and ${} for {}'.format(price, day)
-            break
-        else:
-            prices += '${} for {}, '.format(price, day)
+    if 'single_day' in c.BADGE_PRICES and isinstance(c.BADGE_PRICES['single_day'], dict):
+        for day in c.BADGE_PRICES['single_day']:
+            if not isinstance(day, str) or '-' in day or day.capitalize() not in c.DAYS_OF_WEEK:
+                continue
+            price = c.get_oneday_price(day_name=day)
+            if day == datetime.strftime(c.ESCHATON, "%A"):
+                prices += 'and ${} for {}'.format(price, day)
+                break
+            else:
+                prices += '${} for {}, '.format(price, day)
     return prices
 
 
