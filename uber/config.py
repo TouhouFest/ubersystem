@@ -302,33 +302,32 @@ class Config(_Overridable):
     For all of the datetime config options, we also define BEFORE_ and AFTER_ properties, e.g. you can
     check the booleans returned by c.BEFORE_PLACEHOLDER_DEADLINE or c.AFTER_PLACEHOLDER_DEADLINE
     """
+
     def get_oneday_price(self, dt: datetime | None = None, day_name: str | None = None):
         dt = dt or uber.utils.localized_now()
-        if day_name is None and hasattr(dt, 'strftime'):
-            day_name = dt.strftime('%A')
+        if day_name is None and hasattr(dt, "strftime"):
+            day_name = dt.strftime("%A")
 
-        price = self.BADGE_PRICES.get('single_day', {}).get(day_name, self.DEFAULT_SINGLE_DAY)
+        price = self.BADGE_PRICES.get("single_day", {}).get(
+            day_name, self.DEFAULT_SINGLE_DAY
+        )
         if not isinstance(price, (int, float)):
             price = self.DEFAULT_SINGLE_DAY
 
-        if self.PRICE_BUMPS_ENABLED:
-            localized_now = uber.utils.localized_now()
-            check_dt = dt or localized_now
-
-            # Day-specific date price bumps (e.g. Saturday)
-            if day_name and day_name in self.SINGLE_DAY_PRICE_BUMPS:
-                for bump_date, bumped_price in sorted(self.SINGLE_DAY_PRICE_BUMPS[day_name].items()):
-                    if check_dt >= bump_date:
-                        price = bumped_price
-
-            # General single-day date price bumps
-            for bump_date, bumped_price in sorted(self.SINGLE_DAY_GENERAL_BUMPS.items()):
-                if check_dt >= bump_date:
+        if self.PRICE_BUMPS_ENABLED and day_name:
+            day_ramps = (
+                self.PRICE_RAMPS.get(day_name)
+                or self.PRICE_RAMPS.get(day_name.capitalize())
+                or self.PRICE_RAMPS.get(day_name.lower())
+                or {}
+            )
+            for bump_date, bumped_price in sorted(day_ramps.items()):
+                if dt >= bump_date:
                     price = bumped_price
 
         return price
 
-    def get_presold_oneday_price(self, badge_type: str, dt: datetime = None):
+    def get_presold_oneday_price(self, badge_type: str, dt: datetime | None = None):
         day_name = self.BADGES.get(badge_type)
         if day_name:
             return self.get_oneday_price(dt=dt, day_name=day_name)
@@ -338,8 +337,15 @@ class Config(_Overridable):
         price = self.INITIAL_ATTENDEE
         if self.PRICE_BUMPS_ENABLED:
             localized_now = uber.utils.localized_now()
-            for day, bumped_price in sorted(self.PRICE_BUMPS.items()):
-                if (dt or localized_now) >= day:
+            check_dt = dt or localized_now
+            ramps = (
+                self.PRICE_RAMPS.get("attendee")
+                or self.PRICE_RAMPS.get("Attendee")
+                or self.PRICE_BUMPS
+                or {}
+            )
+            for bump_date, bumped_price in sorted(ramps.items()):
+                if check_dt >= bump_date:
                     price = bumped_price
 
             # Only check bucket-based pricing if we're not checking an existing badge AND
@@ -351,6 +357,117 @@ class Config(_Overridable):
                     if badges_sold >= badge_cap and bumped_price > price:
                         price = bumped_price
         return price
+
+    def get_badge_price(self, badge_name: str | int, dt: datetime | None = None) -> int:
+        """
+        Returns the current price of a badge given its name or type for the given date (defaulting to now).
+        """
+        dt = dt or uber.utils.localized_now()
+
+        # Handle integer badge type enum
+        if isinstance(badge_name, int):
+            if hasattr(self, "ATTENDEE_BADGE") and badge_name == self.ATTENDEE_BADGE:
+                return self.get_attendee_price(dt=dt)
+            if hasattr(self, "BADGES") and badge_name in self.BADGES:
+                badge_str = self.BADGES[badge_name]
+                if badge_str.capitalize() in getattr(
+                    self, "DAYS_OF_WEEK", []
+                ) or badge_str.capitalize() in [
+                    "Monday",
+                    "Tuesday",
+                    "Wednesday",
+                    "Thursday",
+                    "Friday",
+                    "Saturday",
+                    "Sunday",
+                ]:
+                    return self.get_oneday_price(dt=dt, day_name=badge_str.capitalize())
+            if (
+                hasattr(self, "BADGE_TYPE_PRICES")
+                and badge_name in self.BADGE_TYPE_PRICES
+            ):
+                return self.BADGE_TYPE_PRICES[badge_name]
+            return self.get_attendee_price(dt=dt)
+
+        badge_str = str(badge_name).strip()
+        badge_lower = badge_str.lower()
+        badge_cap = badge_str.capitalize()
+
+        # Check attendee badge synonyms
+        attendee_names = {
+            "attendee",
+            "attendee_badge",
+            "weekend",
+            "full weekend",
+            "full_weekend",
+        }
+        if hasattr(self, "BADGES") and hasattr(self, "ATTENDEE_BADGE"):
+            attendee_names.add(str(self.BADGES.get(self.ATTENDEE_BADGE, "")).lower())
+
+        if badge_lower in attendee_names:
+            return self.get_attendee_price(dt=dt)
+
+        # Check for days of the week / single-day badges
+        valid_days = set(getattr(self, "DAYS_OF_WEEK", [])) | {
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday",
+        }
+        if badge_cap in valid_days:
+            return self.get_oneday_price(dt=dt, day_name=badge_cap)
+
+        cleaned_day = (
+            badge_str.replace("Badge", "").replace("badge", "").strip().capitalize()
+        )
+        if cleaned_day in valid_days:
+            return self.get_oneday_price(dt=dt, day_name=cleaned_day)
+
+        # Check dealer badge
+        if badge_lower in {
+            "dealer",
+            "dealer_badge",
+            getattr(self, "DEALER_TERM", "dealer").lower(),
+        }:
+            return getattr(self, "DEALER_BADGE_PRICE", 0)
+
+        # Check group badge
+        if badge_lower in {"group", "group_badge", "group_member"}:
+            return self.get_group_price(dt=dt)
+
+        # Check BADGE_TYPE_PRICES
+        if hasattr(self, "BADGE_TYPE_PRICES"):
+            for btype, bprice in self.BADGE_TYPE_PRICES.items():
+                if (
+                    hasattr(self, "BADGES")
+                    and str(self.BADGES.get(btype, "")).lower() == badge_lower
+                ):
+                    return bprice
+                if str(btype).lower() == badge_lower:
+                    return bprice
+
+        # Check PRICE_RAMPS directly
+        ramps = (
+            self.PRICE_RAMPS.get(badge_str)
+            or self.PRICE_RAMPS.get(badge_cap)
+            or self.PRICE_RAMPS.get(badge_lower)
+            or {}
+        )
+        if ramps:
+            price = self.INITIAL_ATTENDEE
+            if self.PRICE_BUMPS_ENABLED:
+                for bump_date, bumped_price in sorted(ramps.items()):
+                    if dt >= bump_date:
+                        price = bumped_price
+            return price
+
+        # Default fallback to attendee price
+        return self.get_attendee_price(dt=dt)
+
+    get_price_for_badge = get_badge_price
 
     def get_group_price(self, dt=None):
         return self.get_attendee_price(dt) - self.GROUP_DISCOUNT
@@ -639,7 +756,7 @@ class Config(_Overridable):
 
         return opts
 
-    def single_day_opt(self, day_name, dt=None):
+    def single_day_opt(self, day_name: str, dt: datetime | None = None):
         price = self.get_oneday_price(dt=dt, day_name=day_name)
         badge = getattr(self, day_name.upper(), None)
         if badge and getattr(self, day_name.upper() + '_AVAILABLE', None):
@@ -968,10 +1085,10 @@ class Config(_Overridable):
                     price = self.get_oneday_price(dt=day, day_name=day_name)
                     badge = getattr(self, day_name.upper())
                     if getattr(self, day_name.upper() + '_AVAILABLE', None):
-                        opts.append((badge, day_name + ' Badge (${})'.format(price)))
+                        opts.append((badge, f'{day_name} Badge (${price})'))
                     day += timedelta(days=1)
             elif self.ONE_DAY_BADGE_AVAILABLE:
-                opts.append((self.ONE_DAY_BADGE, 'Single Day Badge (${})'.format(self.ONEDAY_BADGE_PRICE)))
+                opts.append((self.ONE_DAY_BADGE, f'Single Day Badge (${self.ONEDAY_BADGE_PRICE})'))
         return opts
 
     @property
@@ -1789,32 +1906,36 @@ def _unrepr(d):
             _unrepr(d[opt])
 
 
-_unrepr(_config['appconf'])
-c.APPCONF = _config['appconf'].dict()
-c.SENTRY = _config['sentry'].dict()
-c.HSTS = _config['hsts'].dict()
-c.REDISCONF = _config['redis'].dict()
-c.REDIS_PREFIX = c.REDISCONF['prefix']
-c.REDIS_STORE = redis.Redis(host=c.REDISCONF['host'], port=c.REDISCONF['port'],
-                            db=c.REDISCONF['db'], decode_responses=True)
+_unrepr(_config["appconf"])
+c.APPCONF = _config["appconf"].dict()
+c.SENTRY = _config["sentry"].dict()
+c.HSTS = _config["hsts"].dict()
+c.REDISCONF = _config["redis"].dict()
+c.REDIS_PREFIX = c.REDISCONF["prefix"]
+c.REDIS_STORE = redis.Redis(
+    host=c.REDISCONF["host"],
+    port=c.REDISCONF["port"],
+    db=c.REDISCONF["db"],
+    decode_responses=True,
+)
 
-c.BADGE_PRICES = _config['badge_prices']
+c.BADGE_PRICES = _config["badge_prices"]
 for _opt, _val in chain(_config.items(), c.BADGE_PRICES.items()):
     if not isinstance(_val, dict) and not hasattr(c, _opt.upper()):
         setattr(c, _opt.upper(), _val)
-for _opt, _val in c.BADGE_PRICES['stocks'].items():
-    _opt = _opt.upper() + '_STOCK'
+for _opt, _val in c.BADGE_PRICES["stocks"].items():
+    _opt = _opt.upper() + "_STOCK"
     if not hasattr(c, _opt):
         setattr(c, _opt, _val)
 
 c.DATES = {}
-c.TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S'
-c.DATE_FORMAT = '%Y-%m-%d'
+c.TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S"
+c.DATE_FORMAT = "%Y-%m-%d"
 c.EVENT_TIMEZONE = pytz.timezone(c.EVENT_TIMEZONE)
-c.make_dates(_config['dates'])
+c.make_dates(_config["dates"])
 
 c.DATA_DIRS = {}
-c.make_data_dirs(_config['data_dirs'])
+c.make_data_dirs(_config["data_dirs"])
 
 if "sqlite" in c.SQLALCHEMY_URL:
     # SQLite does not suport pool_size and max_overflow,
@@ -1825,80 +1946,35 @@ if "sqlite" in c.SQLALCHEMY_URL:
 # Set database connections to recycle after 10 minutes
 c.SQLALCHEMY_POOL_RECYCLE = 3600
 
-c.PRICE_BUMPS = {}
+c.PRICE_RAMPS = defaultdict(dict)
 c.PRICE_LIMITS = {}
-for _opt, _val in c.BADGE_PRICES['attendee'].items():
-    try:
-        if ' ' in _opt:
-            price_date = c.EVENT_TIMEZONE.localize(datetime.strptime(_opt, '%Y-%m-%d %H%M'))
-        else:
-            price_date = c.EVENT_TIMEZONE.localize(datetime.strptime(_opt, '%Y-%m-%d'))
-    except ValueError:
-        c.PRICE_LIMITS[int(_opt)] = _val
-    else:
-        c.PRICE_BUMPS[price_date] = _val
+
+if 'price_ramps' in c.BADGE_PRICES and isinstance(c.BADGE_PRICES['price_ramps'], dict):
+    for _badge_key, _ramps in c.BADGE_PRICES['price_ramps'].items():
+        if isinstance(_ramps, dict):
+            _key_norm = str(_badge_key).capitalize() if str(_badge_key).capitalize() in c.DAYS_OF_WEEK else str(_badge_key).lower()
+            for _date_str, _price_val in _ramps.items():
+                try:
+                    if ' ' in str(_date_str):
+                        _price_date = c.EVENT_TIMEZONE.localize(
+                            datetime.strptime(f'{_date_str} +0000', '%Y-%m-%d %H%M %z').replace(tzinfo=None)
+                        )
+                    else:
+                        _price_date = c.EVENT_TIMEZONE.localize(
+                            datetime.strptime(f'{_date_str} +0000', '%Y-%m-%d %z').replace(tzinfo=None)
+                        )
+                    c.PRICE_RAMPS[_key_norm][_price_date] = int(_price_val)
+                    if _key_norm != _badge_key:
+                        c.PRICE_RAMPS[_badge_key][_price_date] = int(_price_val)
+                except ValueError:
+                    if _key_norm == 'attendee':
+                        try:
+                            c.PRICE_LIMITS[int(_date_str)] = int(_price_val)
+                        except ValueError:
+                            pass
+
+c.PRICE_BUMPS = c.PRICE_RAMPS['attendee']
 c.ORDERED_PRICE_LIMITS = sorted([val for key, val in c.PRICE_LIMITS.items()])
-
-c.SINGLE_DAY_PRICE_BUMPS = defaultdict(dict)
-c.SINGLE_DAY_GENERAL_BUMPS = {}
-
-if 'single_day_bumps' in c.BADGE_PRICES and isinstance(c.BADGE_PRICES['single_day_bumps'], dict):
-    for _day_key, _bumps in c.BADGE_PRICES['single_day_bumps'].items():
-        if isinstance(_bumps, dict):
-            _day_name = str(_day_key).capitalize()
-            for _date_str, _price_val in _bumps.items():
-                try:
-                    if ' ' in str(_date_str):
-                        _price_date = c.EVENT_TIMEZONE.localize(datetime.strptime(str(_date_str), '%Y-%m-%d %H%M'))
-                    else:
-                        _price_date = c.EVENT_TIMEZONE.localize(datetime.strptime(str(_date_str), '%Y-%m-%d'))
-                    c.SINGLE_DAY_PRICE_BUMPS[_day_name][_price_date] = int(_price_val)
-                except ValueError:
-                    pass
-        else:
-            try:
-                if ' ' in str(_day_key):
-                    _price_date = c.EVENT_TIMEZONE.localize(datetime.strptime(str(_day_key), '%Y-%m-%d %H%M'))
-                else:
-                    _price_date = c.EVENT_TIMEZONE.localize(datetime.strptime(str(_day_key), '%Y-%m-%d'))
-                c.SINGLE_DAY_GENERAL_BUMPS[_price_date] = int(_bumps)
-            except ValueError:
-                pass
-
-if 'single_day' in c.BADGE_PRICES and isinstance(c.BADGE_PRICES['single_day'], dict):
-    for _key, _val in c.BADGE_PRICES['single_day'].items():
-        if isinstance(_val, dict):
-            _day_name = str(_key).capitalize()
-            for _date_str, _price_val in _val.items():
-                try:
-                    if ' ' in str(_date_str):
-                        _price_date = c.EVENT_TIMEZONE.localize(datetime.strptime(str(_date_str), '%Y-%m-%d %H%M'))
-                    else:
-                        _price_date = c.EVENT_TIMEZONE.localize(datetime.strptime(str(_date_str), '%Y-%m-%d'))
-                    c.SINGLE_DAY_PRICE_BUMPS[_day_name][_price_date] = int(_price_val)
-                except ValueError:
-                    pass
-        else:
-            _parts = str(_key).split()
-            _day_name = None
-            _date_str = None
-            for _part in _parts:
-                if _part.capitalize() in c.DAYS_OF_WEEK or _part.capitalize() in ['Friday', 'Saturday', 'Sunday', 'Thursday', 'Monday', 'Tuesday', 'Wednesday']:
-                    _day_name = _part.capitalize()
-                elif '-' in _part:
-                    _date_str = _part
-            if _date_str:
-                try:
-                    if ' ' in str(_key) and len(_parts) > 1 and not _day_name:
-                        _price_date = c.EVENT_TIMEZONE.localize(datetime.strptime(str(_key), '%Y-%m-%d %H%M'))
-                    else:
-                        _price_date = c.EVENT_TIMEZONE.localize(datetime.strptime(_date_str, '%Y-%m-%d'))
-                    if _day_name:
-                        c.SINGLE_DAY_PRICE_BUMPS[_day_name][_price_date] = int(_val)
-                    else:
-                        c.SINGLE_DAY_GENERAL_BUMPS[_price_date] = int(_val)
-                except ValueError:
-                    pass
 
 
 # Under certain conditions, we want to completely remove certain payment options from the system.

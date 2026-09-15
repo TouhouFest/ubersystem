@@ -85,7 +85,10 @@ def admin_attendee():
 
 @pytest.fixture
 def clear_price_bumps(request, monkeypatch):
-    monkeypatch.setattr(c, 'PRICE_BUMPS', {})
+    from collections import defaultdict
+
+    monkeypatch.setattr(c, "PRICE_BUMPS", {})
+    monkeypatch.setattr(c, "PRICE_RAMPS", defaultdict(dict))
 
 
 @pytest.fixture(autouse=True)

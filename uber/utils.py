@@ -1,33 +1,31 @@
-import bcrypt
-import cherrypy
 import importlib
 import math
 import os
-import phonenumbers
 import random
 import re
 import string
 import textwrap
 import traceback
-import uber
 import urllib
-
-from collections import defaultdict, OrderedDict
-from datetime import date, datetime, timedelta
+from collections import OrderedDict, defaultdict
+from datetime import UTC, date, datetime, timedelta
 from glob import glob
 from os.path import basename
-from rpctools.jsonrpc import ServerProxy
-from urllib.parse import urlparse, urljoin
+from urllib.parse import urljoin, urlparse
 from uuid import uuid4
+
+import bcrypt
+import cherrypy
+import phonenumbers
 from phonenumbers import PhoneNumberFormat
 from pockets import floor_datetime, listify
 from pockets.autolog import log
-from pytz import UTC
-from sqlalchemy import func, or_, cast, literal
+from rpctools.jsonrpc import ServerProxy
+from sqlalchemy import cast, func, literal, or_
 
-from uber.config import c, _config, signnow_sdk, threadlocal
+import uber
+from uber.config import _config, c, signnow_sdk, threadlocal
 from uber.errors import CSRFException, HTTPRedirect
-
 
 # ======================================================================
 # String manipulation
@@ -252,14 +250,16 @@ def localized_now() -> datetime:
     """
     Returns datetime.now() but localized to the event's timezone.
     """
-    return localize_datetime(datetime.utcnow())
+    return localize_datetime(datetime.now(UTC))
 
 
 def localize_datetime(dt: datetime) -> datetime:
     """
     Converts `dt` to the event's timezone.
     """
-    return dt.replace(tzinfo=UTC).astimezone(c.EVENT_TIMEZONE)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(c.EVENT_TIMEZONE)
 
 
 def hour_day_format(dt):
