@@ -564,7 +564,7 @@ class Attendee(MagModel, TakesPaymentMixin):
         if not self.badge_cost:
             self.badge_cost = self.calculate_badge_cost()
 
-        if self.badge_cost == 0 and self.paid in [c.NOT_PAID, c.PAID_BY_GROUP]:
+        if self.badge_cost == 0 and not self.is_dealer and self.paid in [c.NOT_PAID, c.PAID_BY_GROUP]:
             self.paid = c.NEED_NOT_PAY
 
         if self.birthdate:
@@ -1042,6 +1042,10 @@ class Attendee(MagModel, TakesPaymentMixin):
         elif self.overridden_price is not None and include_price_override:
             return self.overridden_price
         elif self.is_dealer:
+            if self.group and self.group.is_dealer:
+                attendees = self.group.sorted_attendees
+                if self in attendees and attendees.index(self) < c.DEALER_DISCOUNTED_BADGES:
+                    return c.DEALER_DISCOUNTED_BADGE_PRICE
             return c.DEALER_BADGE_PRICE
         elif self.promo_code_groups or (self.group and self.group.auto_recalc and self.paid == c.PAID_BY_GROUP):
             return c.get_group_price()
@@ -1091,7 +1095,7 @@ class Attendee(MagModel, TakesPaymentMixin):
         # account special overrides or upgrades
         registered = self.registered_local if self.registered else localized_now()
         if self.is_dealer:
-            return c.DEALER_BADGE_PRICE
+            return self.calculate_badge_cost()
         elif self.badge_type == c.ONE_DAY_BADGE:
             return c.get_oneday_price(registered)
         elif self.is_presold_oneday:

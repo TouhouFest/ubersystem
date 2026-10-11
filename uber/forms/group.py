@@ -72,9 +72,33 @@ class TableInfo(GroupInfo):
         return list(self._fields.keys())
 
     def badges_label(self):
+        if c.DEALER_DISCOUNTED_BADGES:
+            discounted_price = (
+                "free"
+                if c.DEALER_DISCOUNTED_BADGE_PRICE == 0
+                else format_currency(c.DEALER_DISCOUNTED_BADGE_PRICE)
+            )
+            return (
+                f"Badges (First {c.DEALER_DISCOUNTED_BADGES} {discounted_price}, "
+                f"then {format_currency(c.DEALER_BADGE_PRICE)} each)"
+            )
         return "Badges (" + format_currency(c.DEALER_BADGE_PRICE) + " each)"
 
     def badges_desc(self):
+        if c.DEALER_DISCOUNTED_BADGES:
+            discounted_price = (
+                "free"
+                if c.DEALER_DISCOUNTED_BADGE_PRICE == 0
+                else format_currency(c.DEALER_DISCOUNTED_BADGE_PRICE)
+            )
+            verb = "are" if c.DEALER_DISCOUNTED_BADGES > 1 else "is"
+            return (
+                f"The number of people working your table, including yourself. "
+                f"The first {c.DEALER_DISCOUNTED_BADGES} "
+                f"badge{pluralize(c.DEALER_DISCOUNTED_BADGES)} "
+                f"{verb} {discounted_price} "
+                f"(additional badges are {format_currency(c.DEALER_BADGE_PRICE)} each)."
+            )
         return "The number of people working your table, including yourself."
 
 
