@@ -97,7 +97,7 @@ class Root:
             'Cost',
             'Badges'
         ])
-        dealer_groups = session.query(Group).filter(Group.is_dealer == True).all()  # noqa: E712
+        dealer_groups = session.query(Group).filter(Group.is_dealer == True).all()
         for group in dealer_groups:
             if group.status in c.DEALER_ACCEPTED_STATUSES:
                 full_name = group.leader.full_name if group.leader else ''
@@ -135,9 +135,11 @@ class Root:
             'Categories',
             'Other Category',
             'Special Requests',
+            'Selling NSFW',
+            'Touhou %',
             ])
 
-        dealer_groups = session.query(Group).filter(Group.is_dealer == True).all()  # noqa: E712
+        dealer_groups = session.query(Group).filter(Group.is_dealer == True).all()
 
         def write_url_or_text(cell, is_url=False, last_cell=False):
             if is_url:
@@ -162,6 +164,10 @@ class Root:
                 " / ".join(group.categories_labels),
                 group.categories_text,
                 group.special_needs,
+                "Yes"
+                if group.selling_nsfw
+                else ("No" if group.selling_nsfw is not None else ""),
+                group.touhou_work_percentage_label,
             ] + wares_urls
 
             for cell in row[:-1]:

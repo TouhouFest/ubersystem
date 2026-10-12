@@ -27,6 +27,8 @@
     <tr>
       <th>Name</th>
       <th>Status</th>
+      <th>NSFW?</th>
+      <th>Touhou %</th>
       <th>Website</th>
       <th>Badges{{ macros.popup_link("../static_views/badgeCounts.html") }}</th>
       <th>Tables</th>
@@ -45,6 +47,8 @@
         <td>
             {{ group.status_label }}{% if group.convert_badges and group.badges_purchased %} <span class="text-danger" data-bs-toggle="tooltip" data-bs-placement="top" title="This {{ c.DEALER_TERM }}'s badges will be converted to individual badges tonight!"><i class="fa fa-exclamation-circle"></i></span>{% endif %}
         </td>
+        <td>{{ 'Yes' if group.selling_nsfw else ('No' if group.selling_nsfw is not none else '') }}</td>
+        <td>{{ group.touhou_work_percentage_label }}</td>
         <td>{{ group.website|url_to_link(target="_blank", is_relative=False) }}</td>
         <td data-order="{{ group.badges_purchased }}" data-search="{{ group.badges_purchased }}"> {{ group.badges_purchased }} / {{ group.badges }} </td>
         <td>{{ group.tables }}</td>

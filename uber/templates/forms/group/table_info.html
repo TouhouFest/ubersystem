@@ -11,6 +11,7 @@
     group_status (admin-only)
     website
     categories
+    dealer_questions
     textareas
 
 Use these to add or rearrange fields. Remember to use {{ super() }} to print the original fields as-is.
@@ -194,6 +195,13 @@ get otherCategory() { return this.categories.includes('{{ c.OTHER }}') },
         {% endcall %}
         
     </div>
+{% endblock %}
+</div>
+
+<div class="row g-3 mb-3">
+{% block dealer_questions %}
+    <div class="col-sm">{{ form_macros.input(table_info.selling_nsfw, required_if="is_dealer") }}</div>
+    <div class="col-sm">{{ form_macros.input(table_info.touhou_work_percentage, required_if="is_dealer") }}</div>
 {% endblock %}
 </div>
 

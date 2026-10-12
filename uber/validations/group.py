@@ -59,9 +59,27 @@ TableInfo.field_validation.required_fields = {
     'categories': ("Please select at least one category your wares fall under.",
                    'categories', lambda x: x.form.model.is_dealer),
     'categories_text': ("Please describe what 'other' category your wares fall under.",
-                        'categories', lambda x: c.OTHER in x)
+                        'categories', lambda x: c.OTHER in x),
+    "touhou_work_percentage": (
+        "Please select how much of your work is based on Touhou.",
+        "touhou_work_percentage",
+        lambda x: x.form.model.is_dealer,
+    ),
 }
 
+
+def check_selling_nsfw(form, field):
+    if (
+        form.model.is_dealer
+        and not getattr(form, "is_admin", False)
+        and field.data is None
+    ):
+        raise ValidationError(
+            "Please indicate whether you plan to sell R-18/NSFW works."
+        )
+
+
+TableInfo.field_validation.validations["selling_nsfw"]["required"] = check_selling_nsfw
 
 TableInfo.field_validation.validations['name']['length'] = validators.Length(
     max=40, message="Table names cannot be longer than 40 characters.")
