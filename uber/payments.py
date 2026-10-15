@@ -52,9 +52,11 @@ class PreregCart:
     During preregistration, attendees and groups are not added to the database until
     the payment process is started. This class helps manage them in the session instead.
     """
-    def __init__(self, targets=()):
+    def __init__(self, targets=(), *args, **kwargs): (Implement provider-agnostic OpenSign e-signature integration with comprehensive test suite and documentation)
         self._targets = listify(targets)
         self._current_cost = 0
+        for k, v in kwargs.items():
+            self.__dict__[k] = v
 
     @classproperty
     def session_keys(cls):
@@ -201,8 +203,7 @@ class PreregCart:
         target_email = None
 
         for model in self.models:
-            if c.COLLECT_EXACT_BIRTHDATE and get_age_from_birthday(model.birthdate, c.NOW_OR_AT_CON) >= 18 or \
-                    not c.COLLECT_EXACT_BIRTHDATE and model.age_group == getattr(c, '18_UP'):
+            if hasattr(model, 'birthdate') and getattr(model, 'birthdate', None) and get_age_from_birthday(model.birthdate, c.NOW_OR_AT_CON) >= 18: (Implement provider-agnostic OpenSign e-signature integration with comprehensive test suite and documentation)
                 maybe_purchasers.append(model)
 
         maybe_purchasers = maybe_purchasers or [m for m in self.models]

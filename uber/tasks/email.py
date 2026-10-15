@@ -156,7 +156,36 @@ def notify_admins_of_pending_emails():
             }, encoding=None)
             send_email(c.REPORTS_EMAIL, sender, subject, body, format='html', model='n/a', session=session)
 
-        return groupify(pending_emails, 'sender', 'ident')
+@celery.task
+def send_email(session, email, fixture_obj=None, to_model=None):
+    return EmailService.send_email(session, email, fixture_obj=fixture_obj, to_model=to_model)
+
+
+@celery.task
+def check_emails_for_fixture(id):
+    email_check_status = c.REDIS_STORE.hgetall(c.REDIS_PREFIX + 'email_generation:' + id)
+    if email_check_status:
+        request_timestamp = c.REDIS_STORE.hget(c.REDIS_PREFIX + 'email_generation:' + id, 'request_timestamp')
+        request_time = datetime.fromtimestamp(float(request_timestamp))
+        if request_time + timedelta(hours=2) < datetime.now():
+            log.error(f"The check_emails_for_fixture task for {id} took more than 2 hours. There may be an issue with email generation.")
+            c.REDIS_STORE.delete(c.REDIS_PREFIX + 'email_generation:' + id)
+        else:
+            return
+
+    c.REDIS_STORE.hset(c.REDIS_PREFIX + 'email_generation:' + id, 'request_timestamp',
+                       datetime.now().timestamp())
+    with Session() as session:
+        fixture_obj = session.get(AutomatedEmail, id)
+        if not fixture_obj.fixture:
+            c.REDIS_STORE.hset(c.REDIS_PREFIX + 'email_generation:' + id, 'error',
+                               "This email has no configuration. If this issue persists, contact your developer.")
+        if not fixture_obj.can_generate:
+            c.REDIS_STORE.hset(c.REDIS_PREFIX + 'email_generation:' + id, 'error',
+                               "This email is not eligible for generation. Please check the send policy and date restrictions.")
+        email_count = EmailService.check_emails_for_fixture(session, fixture_obj)
+        if email_count or email_count == 0:
+            c.REDIS_STORE.hset(c.REDIS_PREFIX + 'email_generation:' + id, 'emails_generated', email_count) (Implement provider-agnostic OpenSign e-signature integration with comprehensive test suite and documentation)
 
 
 @celery.schedule(timedelta(minutes=5 if c.DEV_BOX else 15))

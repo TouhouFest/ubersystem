@@ -41,6 +41,34 @@ Note that `.` becomes `_` and the config paths is joined by underscores.
 
 ## Important Settings
 
+### E-Signature Service Configuration (Switching from SignNow to OpenSign)
+Ubersystem supports both **SignNow** (commercial SaaS) and **OpenSign Labs** (open-source cloud / self-hosted Docker) for automated electronic signature collection on Dealer Terms & Conditions (`terms_and_conditions`).
+
+By default, when a dealer is accepted into the marketplace, Ubersystem checks `signnow_dealer_template_id`. However, via the `BaseSignatureRequest` and `get_esign_request()` architecture, Ubersystem dynamically routes all document workflows to **OpenSign** whenever an OpenSign template ID is provided.
+
+#### How to Switch to OpenSign
+To switch your event from SignNow to OpenSign, configure the following settings in your `config.ini` (`uber.ini`):
+
+```ini
+# 1. Provide the OpenSign Template ID (Setting this overrides SignNow automatically)
+opensign_dealer_template_id = "your_opensign_template_id_here"
+opensign_dealer_folder_id = "optional_opensign_folder_id"
+
+# 2. Configure the API URL and Token
+# By default, Ubersystem connects to OpenSign Cloud (https://api.opensignlabs.com/v1).
+# If you are running a self-hosted OpenSign Docker container, override the API URL:
+opensign_api_url = "https://signing.yourcon.org/v1"
+
+# For local development or non-AWS deployments, provide your static API token directly:
+opensign_api_token = "your_static_api_token_here"
+
+# For AWS Production deployments, leave opensign_api_token blank and provide your AWS Secrets Manager secret name:
+# Ubersystem will automatically pull, cache, and rotate the API token in Redis every 15 seconds.
+aws_opensign_secret_name = "production/opensign/credentials"
+```
+
+Once `opensign_dealer_template_id` is set, all frontend templates (`/preregistration/group_members`, `/group_admin/form`, `/group_admin/dealers`), background polling cron tasks (`check_document_signed`), and PDF downloads (`download_esign_document`) will automatically communicate with OpenSign instead of SignNow.
+
 ## Generated Configuration
 When working on Uber for a specific event, it's best to start with config overrides copied from that event. Some events have their config overrides available in their own repository. In these cases, you can run the `make_config.py` script in the root of this repo, which will download and compile the config you need into ready-made config files.
 

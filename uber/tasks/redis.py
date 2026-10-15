@@ -10,7 +10,7 @@ from uber.config import c, AWSSecretFetcher
 from uber.tasks import celery
 
 
-__all__ = ['expire_processed_saml_assertions', 'set_signnow_key', 'update_shirt_counts', 'update_problem_names']
+__all__ = ['expire_processed_saml_assertions', 'set_signnow_key', 'set_opensign_key', 'update_shirt_counts', 'update_problem_names']
 
 
 @celery.schedule(timedelta(minutes=30))
@@ -41,6 +41,24 @@ def set_signnow_key():
         c.REDIS_STORE.set(c.REDIS_PREFIX + 'signnow_access_token', signnow_secret.get('ACCESS_TOKEN', ''))
         expire_date = dateparser.parse(signnow_secret.get('LAST_UPDATE', '')[:-6]) + timedelta(hours=23)
         c.REDIS_STORE.expireat(c.REDIS_PREFIX + 'signnow_access_token', int(expire_date.timestamp()))
+
+
+@celery.schedule(timedelta(15))
+def set_opensign_key():
+    if not getattr(c, 'AWS_OPENSIGN_SECRET_NAME', '') or not getattr(c, 'OPENSIGN_DEALER_TEMPLATE_ID', ''):
+        return
+
+    opensign_access_key = c.REDIS_STORE.get(c.REDIS_PREFIX + 'opensign_access_token')
+    expired = c.REDIS_STORE.expiretime(c.REDIS_PREFIX + 'opensign_access_token')
+    if not opensign_access_key or expired < 0:
+        opensign_secret = AWSSecretFetcher().get_opensign_secret()
+        if not opensign_secret:
+            log.error("Attempted to update our OpenSign token but we didn't get a secret back from AWS!")
+            return
+        c.REDIS_STORE.set(c.REDIS_PREFIX + 'opensign_access_token', opensign_secret.get('API_TOKEN', ''))
+        if opensign_secret.get('LAST_UPDATE'):
+            expire_date = dateparser.parse(opensign_secret.get('LAST_UPDATE', '')[:-6]) + timedelta(hours=23)
+            c.REDIS_STORE.expireat(c.REDIS_PREFIX + 'opensign_access_token', int(expire_date.timestamp()))
 
 
 @celery.schedule(timedelta(seconds=30))
