@@ -107,7 +107,9 @@ class Root:
                 'end_unix': int(mktime(event.end_time.utctimetuple())),
                 'duration': event.duration,
                 'description': event.public_description or event.description,
-                'panelists': [panelist.attendee.full_name for panelist in event.assigned_panelists]
+                'panelists': [panelist.attendee.full_name for panelist in event.assigned_panelists],
+                'rating': event.rating_label,
+                'content': event.content_labels,
             }
             for event in sorted(session.query(Event).all(), key=lambda e: [e.start_time, e.location_name])
         ], indent=4).encode('utf-8')

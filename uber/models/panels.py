@@ -153,6 +153,18 @@ class Event(MagModel):
     def guidebook_desc(self):
         return self.public_description or self.description
 
+    @property
+    def rating_label(self):
+        if self.applications and len(c.PANEL_RATING_OPTS) > 1:
+            return self.applications[0].rating_label
+        return ''
+
+    @property
+    def content_labels(self):
+        if self.applications and len(c.PANEL_CONTENT_OPTS) > 1:
+            return self.applications[0].granular_rating_labels
+        return []
+
 
 class AssignedPanelist(MagModel):
     attendee_id = Column(UUID, ForeignKey('attendee.id', ondelete='cascade'))
