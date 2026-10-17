@@ -329,8 +329,6 @@ class Config(_Overridable):
     def get_group_price(self, dt=None):
         return self.get_attendee_price(dt) - self.GROUP_DISCOUNT
 
-    def get_table_price(self, table_count):
-        return sum(c.TABLE_PRICES[i] for i in range(1, 1 + int(float(table_count))))
 
     def get_badge_count_by_type(self, badge_type):
         """
@@ -407,7 +405,7 @@ class Config(_Overridable):
 
     @property
     def TABLE_OPTS(self):
-        return [(x, str(x)) for x in list(range(1, c.MAX_TABLES + 1))]
+        return [(key, name) for key, name in c.VENDOR_TYPES.items()]
 
     @property
     def ADMIN_TABLE_OPTS(self):
@@ -415,8 +413,10 @@ class Config(_Overridable):
 
     @property
     def PREREG_TABLE_OPTS(self):
-        return [(count, '{}: ${}'.format(desc, self.get_table_price(count)))
-                for count, desc in c.TABLE_OPTS]
+        return [
+            (key, f'{name}, ${c.VENDOR_PRICES[key]}')
+            for key, name in c.TABLE_OPTS
+        ]
 
     @property
     def ART_SHOW_OPEN(self):
@@ -1860,9 +1860,6 @@ c.RECEIPT_DEPT_CATEGORIES = {}
 for _name, _val in _config['enums']['receipt_item_dept'].items():
     _val = getattr(c, _name.upper())
     c.RECEIPT_DEPT_CATEGORIES[_val] = {getattr(c, key.upper()): val for key, val in _config['enums'][_name].items()}
-
-c.TABLE_PRICES = defaultdict(lambda: _config['table_prices']['default_price'],
-                             {int(k): v for k, v in _config['table_prices'].items() if k != 'default_price'})
 
 # Let admins remove door payment methods by making their label blank
 c.DOOR_PAYMENT_METHOD_OPTS = [opt for opt in c.DOOR_PAYMENT_METHOD_OPTS if opt[1]]

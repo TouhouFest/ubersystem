@@ -498,7 +498,7 @@ def table_cost(group, new_group=None):
     if not new_group:
         table_count = int(float(group.tables))
         if table_count:
-            return (f"{table_count} Tables", c.get_table_price(table_count) * 100, 'tables')
+            return (c.VENDOR_TYPES[table_count], c.VENDOR_PRICES[table_count] * 100, 'tables')
         return
     
     old_tables = int(float(group.tables))
@@ -512,7 +512,7 @@ def table_cost(group, new_group=None):
     else:
         label = "Remove"
     
-    diff = (c.get_table_price(new_tables) - c.get_table_price(old_tables)) * 100
+    diff = (c.VENDOR_PRICES[new_tables] - c.VENDOR_PRICES[old_tables]) * 100
     
     return (f"{label} {abs(new_tables - old_tables)} Tables", diff, 'tables')
 

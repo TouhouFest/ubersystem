@@ -13,7 +13,7 @@ __all__ = ['GroupInfo', 'ContactInfo', 'TableInfo', 'AdminGroupInfo', 'AdminTabl
 class GroupInfo(MagForm):
     name = StringField('Group Name')
     badges = IntegerField('Badges', default=0, widget=IntSelect())
-    tables = DecimalField('Tables', default=0, widget=IntSelect())
+    tables = DecimalField('Exhibitor Type', default=0, widget=IntSelect())
 
     def badges_label(self):
         return "Badges (" + format_currency(c.GROUP_PRICE) + " each)"
