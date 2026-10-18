@@ -408,10 +408,6 @@ class Config(_Overridable):
         return [(key, name) for key, name in c.VENDOR_TYPES.items()]
 
     @property
-    def ADMIN_TABLE_OPTS(self):
-        return [(0, '0')] + c.TABLE_OPTS
-
-    @property
     def PREREG_TABLE_OPTS(self):
         return [
             (key, f'{name}, ${c.VENDOR_PRICES[key]}')

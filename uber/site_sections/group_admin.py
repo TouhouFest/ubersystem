@@ -39,17 +39,16 @@ class Root:
         dealer_groups = groups.filter(Group.is_dealer == True)  # noqa: E712
         dealer_counts['total'] = dealer_groups.count()
         for group in dealer_groups:
-            dealer_counts['tables'] += group.tables
             dealer_counts['badges'] += group.badges
             match group.status:
                 case c.UNAPPROVED:
-                    dealer_counts['unapproved'] += group.tables
+                    dealer_counts['unapproved'] += 1
                 case c.WAITLISTED:
-                    dealer_counts['waitlisted'] += group.tables
+                    dealer_counts['waitlisted'] += 1
                 case c.APPROVED:
-                    dealer_counts['approved'] += group.tables
+                    dealer_counts['approved'] += 1
                 case c.SHARED:
-                    dealer_counts['approved'] += group.tables
+                    dealer_counts['approved'] += 1
 
         guest_groups = groups.filter(Group.guest != None)
 
@@ -63,7 +62,6 @@ class Root:
             'band_checklist_items': GuestGroup(group_type=c.BAND).sorted_checklist_items,
             'num_dealer_groups': dealer_counts['total'],
             'dealer_badges': dealer_counts['badges'],
-            'tables': dealer_counts['tables'],
             'unapproved_tables': dealer_counts['unapproved'],
             'waitlisted_tables': dealer_counts['waitlisted'],
             'approved_tables': dealer_counts['approved'],

@@ -19,7 +19,7 @@ get showNewBadgeFields() { return this.is_new || this.badges > {{ group_or_table
 <div class="row g-3 mb-3">
 {% block badges_tables %}
     <div class="col-sm">
-        {% call form_macros.input(group_or_table_info.tables, choices=c.ADMIN_TABLE_OPTS) %}
+        {% call form_macros.input(group_or_table_info.tables, choices=c.TABLE_OPTS) %}
             {{ form_macros.input(group_or_table_info.is_dealer,
                 admin_text=c.DEALER_TERM|title ~ "s are prevented from paying until they are approved, but may assign and purchase add-ons for badges.",
                 alpine_model="is_dealer") }}
