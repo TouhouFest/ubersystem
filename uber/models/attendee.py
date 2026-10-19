@@ -564,7 +564,8 @@ class Attendee(MagModel, TakesPaymentMixin):
         if not self.badge_cost:
             self.badge_cost = self.calculate_badge_cost()
 
-        if self.badge_cost == 0 and self.paid == c.NOT_PAID:
+        # Dealer badges must remain PAID_BY_GROUP to retain dealer status, ribbons, and group billing.
+        if self.badge_cost == 0 and not self.is_dealer and self.paid in [c.NOT_PAID, c.PAID_BY_GROUP]:
             self.paid = c.NEED_NOT_PAY
 
         if self.birthdate:
