@@ -86,9 +86,9 @@ class TableInfo(GroupInfo):
     selling_nsfw = SelectBooleanField("Do you plan on selling R-18/NSFW works?")
     touhou_work_percentage = SelectField(
         "How much of your work is based on Touhou?",
-        choices=[(0, "Please select an option")] + c.TOUHOU_WORK_PERCENTAGE_OPTS,
+        choices=c.TOUHOU_WORK_PERCENTAGE_OPTS,
         coerce=int,
-        default=0,
+        default=c.ONE_HUNDRED,
     )
     special_needs = TextAreaField('Special Requests', description="No guarantees that we can accommodate any requests.")
 

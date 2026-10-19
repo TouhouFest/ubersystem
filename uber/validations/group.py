@@ -60,11 +60,6 @@ TableInfo.field_validation.required_fields = {
                    'categories', lambda x: x.form.model.is_dealer),
     'categories_text': ("Please describe what 'other' category your wares fall under.",
                         'categories', lambda x: c.OTHER in x),
-    "touhou_work_percentage": (
-        "Please select how much of your work is based on Touhou.",
-        "touhou_work_percentage",
-        lambda x: x.form.model.is_dealer,
-    ),
 }
 
 

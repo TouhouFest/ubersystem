@@ -164,9 +164,7 @@ class Root:
                 " / ".join(group.categories_labels),
                 group.categories_text,
                 group.special_needs,
-                "Yes"
-                if group.selling_nsfw
-                else ("No" if group.selling_nsfw is not None else ""),
+                "Yes" if group.selling_nsfw else "No",
                 group.touhou_work_percentage_label,
             ] + wares_urls
 
