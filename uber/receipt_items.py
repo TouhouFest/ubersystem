@@ -541,6 +541,12 @@ def badge_cost(group, new_group=None):
     category = c.BADGE if new_group.is_dealer else c.GROUP_BADGE
 
     if new_badges > old_badges:
+        if new_group.is_dealer and c.DEALER_DISCOUNTED_BADGES:
+            cost_table = defaultdict(int)
+            for i in range(old_badges, new_badges):
+                price = c.DEALER_DISCOUNTED_BADGE_PRICE if i < c.DEALER_DISCOUNTED_BADGES else c.DEALER_BADGE_PRICE
+                cost_table[price * 100] += 1
+            return (f"Add {label} Badge", cost_table, category)
         return (f"Add {label} Badge", new_group.new_badge_cost * 100, category, badge_diff)
     else:
         cost_table = defaultdict(int)
