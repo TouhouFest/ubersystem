@@ -88,7 +88,7 @@ class TableInfo(GroupInfo):
         "How much of your work is based on Touhou?",
         choices=c.TOUHOU_WORK_PERCENTAGE_OPTS,
         coerce=int,
-        default=c.ONE_HUNDRED,
+        default=c.ZERO,
     )
     special_needs = TextAreaField('Special Requests', description="No guarantees that we can accommodate any requests.")
 

@@ -59,7 +59,7 @@ TableInfo.field_validation.required_fields = {
     'categories': ("Please select at least one category your wares fall under.",
                    'categories', lambda x: x.form.model.is_dealer),
     'categories_text': ("Please describe what 'other' category your wares fall under.",
-                        'categories', lambda x: c.OTHER in x),
+                        'categories', lambda x: c.OTHER in x)
 }
 
 
