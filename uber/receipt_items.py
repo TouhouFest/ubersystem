@@ -544,16 +544,9 @@ def badge_cost(group, new_group=None):
         if new_group.is_dealer and c.DEALER_DISCOUNTED_BADGES:
             cost_table = defaultdict(int)
             for i in range(old_badges, new_badges):
-                price = (
-                    c.DEALER_DISCOUNTED_BADGE_PRICE
-                    if i < c.DEALER_DISCOUNTED_BADGES
-                    else c.DEALER_BADGE_PRICE
-                )
-                if price:
-                    cost_table[price * 100] += 1
-            if cost_table:
-                return (f"Add {label} Badge", cost_table, category)
-            return
+                price = c.DEALER_DISCOUNTED_BADGE_PRICE if i < c.DEALER_DISCOUNTED_BADGES else c.DEALER_BADGE_PRICE
+                cost_table[price * 100] += 1
+            return (f"Add {label} Badge", cost_table, category)
         return (f"Add {label} Badge", new_group.new_badge_cost * 100, category, badge_diff)
     else:
         cost_table = defaultdict(int)
@@ -566,11 +559,9 @@ def badge_cost(group, new_group=None):
 
         for count in range(badge_diff):
             attendee = ordered_badges[count]
-            if attendee.badge_cost:
-                cost_table[attendee.badge_cost * -100] += 1
-        if cost_table:
-            return (f"Remove {label} Badge", cost_table, category)
-        return
+            cost_table[attendee.badge_cost * 100 * -1] += 1
+            count += 1
+        return (f"Remove {label} Badge", cost_table, category)
 
 
 @receipt_calculation.Group

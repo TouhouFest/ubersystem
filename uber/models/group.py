@@ -95,14 +95,9 @@ class Group(MagModel, TakesPaymentMixin):
         assigned = [a for a in self.attendees if not a.is_unassigned]
         if len(assigned) == 1:
             [self.leader] = assigned
-        if self.is_dealer and self.auto_recalc:
-            for idx, a in enumerate(self.sorted_attendees):
-                a.badge_cost = (
-                    c.DEALER_DISCOUNTED_BADGE_PRICE
-                    if idx < c.DEALER_DISCOUNTED_BADGES
-                    else c.DEALER_BADGE_PRICE
-                )
         if self.auto_recalc:
+            for a in self.sorted_attendees:
+                a.badge_cost = a.calculate_badge_cost()
             self.cost = self.calc_default_cost()
         elif not self.cost:
             self.cost = 0
@@ -348,11 +343,7 @@ class Group(MagModel, TakesPaymentMixin):
     @property
     def new_badge_cost(self):
         if self.is_dealer:
-            return (
-                c.DEALER_DISCOUNTED_BADGE_PRICE
-                if self.badges < c.DEALER_DISCOUNTED_BADGES
-                else c.DEALER_BADGE_PRICE
-            )
+            return c.DEALER_DISCOUNTED_BADGE_PRICE if self.badges < c.DEALER_DISCOUNTED_BADGES else c.DEALER_BADGE_PRICE
         return c.get_group_price()
 
     @property
