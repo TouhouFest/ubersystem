@@ -208,9 +208,9 @@ class Root:
             dict.pop(0, None)
 
         for tables in paid_tables:
-            paid_table_sums[tables] = c.get_table_price(tables) * paid_tables[tables]
+            paid_table_sums[tables] = c.VENDOR_PRICES[tables] * paid_tables[tables]
         for tables in unpaid_tables:
-            unpaid_table_sums[tables] = c.get_table_price(tables) * unpaid_tables[tables]
+            unpaid_table_sums[tables] = c.VENDOR_PRICES[tables] * unpaid_tables[tables]
 
         return {
             'total_dealers': dealers.count(),
