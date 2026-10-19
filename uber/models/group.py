@@ -96,8 +96,11 @@ class Group(MagModel, TakesPaymentMixin):
         if len(assigned) == 1:
             [self.leader] = assigned
         if self.auto_recalc:
-            for a in self.sorted_attendees:
-                a.badge_cost = a.calculate_badge_cost()
+            # Dealer badges have positional discounts and static pricing. Regular groups
+            # lock in their attendee badge costs at registration time across pricing tiers.
+            if self.is_dealer:
+                for a in self.sorted_attendees:
+                    a.badge_cost = a.calculate_badge_cost()
             self.cost = self.calc_default_cost()
         elif not self.cost:
             self.cost = 0
