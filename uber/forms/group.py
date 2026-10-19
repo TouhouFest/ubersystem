@@ -1,13 +1,35 @@
-from markupsafe import Markup
-from wtforms import (BooleanField, DecimalField, EmailField,
-                     SelectField, SelectMultipleField, IntegerField,
-                     StringField, TelField, TextAreaField, HiddenField)
+from wtforms import (
+    BooleanField,
+    DecimalField,
+    EmailField,
+    IntegerField,
+    SelectField,
+    SelectMultipleField,
+    StringField,
+    TelField,
+    TextAreaField,
+)
 
 from uber.config import c
-from uber.forms import AddressForm, CustomValidation, MultiCheckbox, MagForm, IntSelect, NumberInputGroup
 from uber.custom_tags import format_currency, pluralize
+from uber.forms import (
+    AddressForm,
+    CustomValidation,
+    IntSelect,
+    MagForm,
+    MultiCheckbox,
+    NumberInputGroup,
+    SelectBooleanField,
+)
 
-__all__ = ['GroupInfo', 'ContactInfo', 'TableInfo', 'AdminGroupInfo', 'AdminTableInfo', 'LeaderInfo']
+__all__ = [
+    "AdminGroupInfo",
+    "AdminTableInfo",
+    "ContactInfo",
+    "GroupInfo",
+    "LeaderInfo",
+    "TableInfo",
+]
 
 
 class GroupInfo(MagForm):
@@ -61,6 +83,13 @@ class TableInfo(GroupInfo):
                           "You must include links to what you sell or a portfolio otherwise you will be automatically waitlisted.")
     categories = SelectMultipleField('Categories', choices=c.DEALER_WARES_OPTS, coerce=int, widget=MultiCheckbox())
     categories_text = StringField('Other')
+    selling_nsfw = SelectBooleanField("Do you plan on selling R-18/NSFW works?")
+    touhou_work_percentage = SelectField(
+        "How much of your work is based on Touhou?",
+        choices=c.TOUHOU_WORK_PERCENTAGE_OPTS,
+        coerce=int,
+        default=c.ZERO,
+    )
     special_needs = TextAreaField('Special Requests', description="No guarantees that we can accommodate any requests.")
 
     def get_non_admin_locked_fields(self, group):

@@ -49,6 +49,10 @@ class Group(MagModel, TakesPaymentMixin):
     categories_text = Column(UnicodeText)
     description = Column(UnicodeText)
     special_needs = Column(UnicodeText)
+    selling_nsfw = Column(Boolean, default=False)
+    touhou_work_percentage = Column(
+        Choice(c.TOUHOU_WORK_PERCENTAGE_OPTS), nullable=True
+    )
 
     cost = Column(Integer, default=0, admin_only=True)
     auto_recalc = Column(Boolean, default=True, admin_only=True)

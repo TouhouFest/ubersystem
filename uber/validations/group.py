@@ -63,6 +63,19 @@ TableInfo.field_validation.required_fields = {
 }
 
 
+def check_selling_nsfw(form, field):
+    if (
+        form.model.is_dealer
+        and not getattr(form, "is_admin", False)
+        and field.data is None
+    ):
+        raise ValidationError(
+            "Please indicate whether you plan to sell R-18/NSFW works."
+        )
+
+
+TableInfo.field_validation.validations["selling_nsfw"]["required"] = check_selling_nsfw
+
 TableInfo.field_validation.validations['name']['length'] = validators.Length(
     max=40, message="Table names cannot be longer than 40 characters.")
 
