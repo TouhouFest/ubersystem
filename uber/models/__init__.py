@@ -142,11 +142,11 @@ class MagModel:
         automated emails -- override this instead.
         """
         return self.email
-    
+
     def cc_emails_for_ident(self, ident=''):
         # A list of emails to carbon-copy for an automated email with a particular ident
         return
-    
+
     def bcc_emails_for_ident(self, ident=''):
         # A list of emails to blind-carbon-copy for an automated email with a particular ident
         return
@@ -201,7 +201,7 @@ class MagModel:
     def auto_update_receipt(self, params):
         """
         Allows event plugins to preprocess a set of params before a model's receipt is updated.
-        If we keep the receipt auto-updater around long enough, we should move some of the 
+        If we keep the receipt auto-updater around long enough, we should move some of the
         ReceiptManager class's auto_update_receipt to this function.
         """
         return params
@@ -300,7 +300,7 @@ class MagModel:
 
     def last_synced_dt(self, key):
         return dateparser.parse(json.loads(self.last_synced.get(key, '"1970/01/01"')))
-    
+
     def update_last_synced(self, key, sync_time):
         self.last_synced[key] = json.dumps(str(UTC.localize(dateparser.parse(sync_time))))
 
@@ -769,7 +769,7 @@ class Session(SessionManager):
         def current_admin_account(self):
             if getattr(cherrypy, 'session', {}).get('account_id'):
                 return self.admin_account(cherrypy.session.get('account_id'))
-            
+
         def current_supervisor_admin(self):
             if getattr(cherrypy, 'session', {}).get('kiosk_supervisor_id'):
                 return self.admin_account(cherrypy.session.get('kiosk_supervisor_id'))
@@ -780,7 +780,7 @@ class Session(SessionManager):
                     return self.admin_account(cherrypy.session.get('account_id')).attendee
                 except NoResultFound:
                     return
-                
+
         def kiosk_operator_attendee(self):
             if self.current_supervisor_admin and getattr(cherrypy, 'session', {}).get('kiosk_operator_id'):
                 try:
@@ -834,7 +834,7 @@ class Session(SessionManager):
             if attendee.access_sections:
                 return max([admin.max_level_access(section,
                                                    read_only=read_only) for section in attendee.access_sections])
-            
+
         def admin_group_max_access(self, group, read_only=True):
             admin = self.current_admin_account()
             if not admin:
@@ -843,7 +843,7 @@ class Session(SessionManager):
             if admin.full_registration_admin or group.creator == admin.attendee or \
                     (admin.attendee.group and admin.attendee.group == group) or group.is_new:
                 return AccessGroup.FULL
-            
+
             if group.access_sections:
                 return max([admin.max_level_access(section,
                                                    read_only=read_only) for section in group.access_sections])
@@ -875,7 +875,7 @@ class Session(SessionManager):
 
             if 'dealer_admin' in admin.read_or_write_access_set:
                 subqueries.append(self.query(Group).filter(Group.is_dealer))
-            
+
             if 'showcase_admin' in admin.read_or_write_access_set:
                 subqueries.append(self.query(Group).join(
                     GuestGroup, Group.id == GuestGroup.group_id).filter(
@@ -913,7 +913,7 @@ class Session(SessionManager):
                             Group.id == Attendee.group_id,
                             GuestGroup.group_id == Group.id,
                             GuestGroup.group_type.in_([c.BAND, c.ROCK_ISLAND, c.SIDE_STAGE]))))
-            
+
             return_dict['guest_admin'] = self.query(Attendee).outerjoin(Group, Attendee.group_id == Group.id).join(
                 GuestGroup, Group.id == GuestGroup.group_id).filter(
                     ~Attendee.ribbon.contains(c.BAND),
@@ -1257,7 +1257,7 @@ class Session(SessionManager):
                 pass
 
             return receipt
-        
+
         def check_receipt_closed(self, receipt):
             self.refresh(receipt)
             if receipt.current_receipt_amount == 0:
@@ -1533,7 +1533,7 @@ class Session(SessionManager):
                 self.commit()
 
             return errors
-        
+
         def get_next_badge_num(self, badge_type):
             """
             Returns the next open badge number for a given badge type.
@@ -1779,7 +1779,7 @@ class Session(SessionManager):
                 search_uuid = terms[0][len(c.EVENT_QR_ID):]
                 if re.match('^[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}$', search_uuid):
                     id_search = search_uuid
-                
+
             if id_search:
                 id_list = [
                     Attendee.id,

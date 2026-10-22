@@ -188,7 +188,7 @@ class Group(MagModel, TakesPaymentMixin):
                                      "You may want to share this group's table with that group instead.")
                 else:
                     self.shared_with_id = shared_group.id
-    
+
     @presave_adjustment
     def unshare_table(self):
         if self.status != c.SHARED:
@@ -490,7 +490,7 @@ class Group(MagModel, TakesPaymentMixin):
     @property
     def guidebook_header(self):
         return ''
-    
+
     @property
     def guidebook_thumbnail(self):
         return ''
@@ -512,7 +512,7 @@ class Group(MagModel, TakesPaymentMixin):
             'guidebook_header': '',
             'guidebook_thumbnail': '',
         }
-    
+
     @property
     def guidebook_images(self):
         return ['', ''], ['', '']
