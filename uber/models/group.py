@@ -1,7 +1,10 @@
 import math
 from datetime import datetime
+from os import makedirs
+from shutil import copyfileobj
 from uuid import uuid4
 
+from cherrypy._cpreqbody import Part
 from pytz import UTC
 from residue import CoerceUTF8 as UnicodeText, UTCDateTime, UUID
 from sqlalchemy import and_, exists, or_, func, select
@@ -17,6 +20,7 @@ from uber.decorators import presave_adjustment
 from uber.models import MagModel
 from uber.models.types import default_relationship as relationship, utcnow, Choice, DefaultColumn as Column, \
     MultiChoice, TakesPaymentMixin
+from uber.models.upload import Upload
 from uber.utils import add_opt
 
 
@@ -52,6 +56,10 @@ class Group(MagModel, TakesPaymentMixin):
     selling_nsfw = Column(Boolean, default=False)
     touhou_work_percentage = Column(
         Choice(c.TOUHOU_WORK_PERCENTAGE_OPTS), nullable=True
+    )
+    uploads = relationship(
+        'Upload', 'model_upload',
+        cascade='save-update,merge,refresh-expire,expunge'
     )
 
     cost = Column(Integer, default=0, admin_only=True)
@@ -516,3 +524,18 @@ class Group(MagModel, TakesPaymentMixin):
     @property
     def guidebook_images(self):
         return ['', ''], ['', '']
+
+    @property
+    def examples(self):
+        pass
+
+    @examples.setter
+    def examples(self, files: list[Part]) -> None:
+        for part in files:
+            upload = Upload(mime=part.content_type.value)
+            uuid = str(upload.id)
+            dir = f'uploaded_files/{uuid[:2]}'
+            makedirs(dir, 0o600, True)
+            with open(f'{dir}/{uuid}', 'wb') as fp:
+                copyfileobj(part.file, fp)
+            self.uploads.append(upload)
