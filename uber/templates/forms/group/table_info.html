@@ -1,6 +1,6 @@
 {% import 'macros.html' as macros with context %}
 {% import 'forms/macros.html' as form_macros with context %}
-{% set table_info = table_info or forms['table_info'] %}
+{% set table_info = table_info or forms.get('table_info', forms['new_table_info']) %}
 
 {# BLOCK NAMES in this form:
     x_data
@@ -13,6 +13,7 @@
     categories
     dealer_questions
     textareas
+    examples
 
 Use these to add or rearrange fields. Remember to use {{ super() }} to print the original fields as-is.
 #}
@@ -213,5 +214,13 @@ get otherCategory() { return this.categories.includes('{{ c.OTHER }}') },
     <div class="col">{{ form_macros.input(table_info.special_needs) }}</div>
 {% endblock %}
 </div>
+
+{% if group.is_new %}
+<div class="row g-3 mb-3">
+{% block examples %}
+    <div class="col-sm">{{ form_macros.input(table_info.examples, required_if="is_dealer") }}</div>
+{% endblock %}
+</div>
+{% endif %}
 
 </div>

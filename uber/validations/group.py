@@ -3,9 +3,7 @@ from functools import wraps
 from datetime import date
 
 from markupsafe import Markup
-from wtforms import (BooleanField, DateField, EmailField,
-                     HiddenField, SelectField, SelectMultipleField, IntegerField,
-                     StringField, TelField, validators, TextAreaField)
+from wtforms import MultipleFileField, validators
 from wtforms.validators import ValidationError, StopValidation
 
 from uber.config import c
@@ -18,6 +16,15 @@ from uber.model_checks import invalid_phone_number
 from uber.utils import get_age_conf_from_birthday
 from uber.forms.group import *
 from uber.validations import address_required_validators, valid_zip_code, which_required_region
+
+@TableInfo.field_validation('examples')
+def are_images(form: MagForm, field: MultipleFileField) -> None:
+    for file in field.data:
+        if not file.content_type.value.startswith('image'):
+            raise ValidationError(
+                "Our server did not recognize one of your uploads as a " +
+                "valid image."
+            )
 
 
 GroupInfo.field_validation.required_fields = {

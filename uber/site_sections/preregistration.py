@@ -3,6 +3,7 @@ import six
 import uuid
 from datetime import datetime, timedelta
 from functools import wraps
+from os import remove
 from uber.models.admin import PasswordReset
 
 import bcrypt
@@ -347,7 +348,7 @@ class Root:
         badges = params.get('badges', 0)
         attendee = group.attendees[0] if group.attendees else None
 
-        forms = load_forms(params, group, ['ContactInfo', 'TableInfo'], force_form_defaults=force_form_defaults)
+        forms = load_forms(params, group, ['ContactInfo', 'NewTableInfo'], force_form_defaults=force_form_defaults)
 
         if cherrypy.request.method == 'POST':
             for form in forms.values():
@@ -2265,12 +2266,16 @@ class Root:
                     return {"error": {'': ["We could not find the group you're trying to update."]}}
 
         if not form_list:
-            form_list = ['ContactInfo', 'TableInfo']
+            form_list = ['ContactInfo', 'NewTableInfo']
         elif isinstance(form_list, str):
             form_list = [form_list]
         forms = load_forms(params, group, form_list)
 
         all_errors = validate_model(forms, group)
+        if 'examples' in all_errors:
+            for upload in group.uploads:
+                uuid = upload.id
+                remove(f'{c.UPLOADED_FILES_DIR}/{uuid[:2]}/{uuid}')
         if all_errors:
             return {"error": all_errors}
 

@@ -136,7 +136,7 @@ class PreregCart:
         elif isinstance(m, Group):
             d = m.to_dict(
                 Group.to_dict_default_attrs
-                + ['attendees']
+                + ['attendees', 'uploads']
                 + list(Group._extra_apply_attrs_restricted))
             for key in params:
                 if params.get(key):
@@ -160,7 +160,11 @@ class PreregCart:
 
     @classmethod
     def from_sessionized_group(cls, d):
-        d = dict(d, attendees=[cls.from_sessionized_attendee(a) for a in d.get('attendees', [])])
+        d = dict(
+            d,
+            attendees=[cls.from_sessionized_attendee(a) for a in d.get('attendees', [])],
+            uploads=[uber.models.Upload(_defer_defaults_=True, **u) for u in d.get('uploads', [])]
+        )
         badge_count = d.pop('badge_count', 0)
         g = uber.models.Group(_defer_defaults_=True, **d)
         g.badge_count = d['badge_count'] = badge_count
