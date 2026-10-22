@@ -631,6 +631,7 @@ from uber.models.attraction import *  # noqa: F401,E402,F403
 from uber.models.tabletop import *  # noqa: F401,E402,F403
 from uber.models.guests import *  # noqa: F401,E402,F403
 from uber.models.art_show import *  # noqa: F401,E402,F403
+from uber.models.upload import *
 
 # Explicitly import models used by the Session class to quiet flake8
 from uber.models.admin import AccessGroup, AdminAccount, WatchList, WorkstationAssignment  # noqa: E402
