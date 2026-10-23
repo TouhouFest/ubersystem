@@ -3,7 +3,6 @@ import six
 import uuid
 from datetime import datetime, timedelta
 from functools import wraps
-from os import remove
 from uber.models.admin import PasswordReset
 
 import bcrypt
@@ -2250,7 +2249,9 @@ class Root:
     @ajax
     def validate_dealer(self, session, form_list=[], is_prereg=False, **params):
         id = params.get('id', params.get('edit_id'))
+        new = False
         if id in [None, '', 'None']:
+            new = True
             group = Group(is_dealer=True)
         else:
             try:
@@ -2266,17 +2267,13 @@ class Root:
                     return {"error": {'': ["We could not find the group you're trying to update."]}}
 
         if not form_list:
-            form_list = ['ContactInfo', 'NewTableInfo']
+            form_list = ['ContactInfo', 'NewTableInfo' if new else 'TableInfo']
         elif isinstance(form_list, str):
             form_list = [form_list]
         forms = load_forms(params, group, form_list)
 
         all_errors = validate_model(forms, group)
         if all_errors:
-            if 'examples' in all_errors:
-                for upload in group.uploads:
-                    uuid = upload.id
-                    remove(f'{c.UPLOADED_FILES_DIR}/{uuid[:2]}/{uuid}')
             return {"error": all_errors}
 
         return {"success": True}
