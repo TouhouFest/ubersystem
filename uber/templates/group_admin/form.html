@@ -200,7 +200,7 @@
     {% endif %}
       <div role="tabpanel" class="tab-pane" id="uploads" aria-labelledby="uploads-tab">
         {% for upload in group.uploads %}
-          <img src='/uploads?id={{ upload.id }}'>
+          <img src='/uploads?id={{ upload.id }}' style='width: 100%'>
         {% endfor %}
       </div>
     </div>
