@@ -2272,11 +2272,11 @@ class Root:
         forms = load_forms(params, group, form_list)
 
         all_errors = validate_model(forms, group)
-        if 'examples' in all_errors:
-            for upload in group.uploads:
-                uuid = upload.id
-                remove(f'{c.UPLOADED_FILES_DIR}/{uuid[:2]}/{uuid}')
         if all_errors:
+            if 'examples' in all_errors:
+                for upload in group.uploads:
+                    uuid = upload.id
+                    remove(f'{c.UPLOADED_FILES_DIR}/{uuid[:2]}/{uuid}')
             return {"error": all_errors}
 
         return {"success": True}
