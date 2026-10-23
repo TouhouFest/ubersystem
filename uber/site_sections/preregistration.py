@@ -3,6 +3,7 @@ import six
 import uuid
 from datetime import datetime, timedelta
 from functools import wraps
+from os import remove
 from uber.models.admin import PasswordReset
 
 import bcrypt
@@ -235,7 +236,7 @@ class Root:
         errors = check_if_can_reg(is_dealer_reg=True)
         if errors:
             return errors
-        
+
         cherrypy.session['imported_attendee_ids'] = {}
         for key in PreregCart.session_keys:
             cherrypy.session.pop(key)
@@ -274,10 +275,10 @@ class Root:
 
             if old_attendee.promo_code and not old_attendee.promo_code.is_expired:
                 unpaid_uses_count = PreregCart.get_unpaid_promo_code_uses_count(old_attendee.promo_code.id, new_attendee.id)
-                
+
                 if old_attendee.promo_code.is_unlimited or (old_attendee.promo_code.uses_remaining - unpaid_uses_count) > 0:
                     new_attendee.promo_code = old_attendee.promo_code
-            
+
             if old_attendee.badge_type in c.BADGE_TYPE_PRICES and old_attendee.badge_type not in c.SOLD_OUT_BADGE_TYPES:
                 new_attendee.badge_type = old_attendee.badge_type
                 new_attendee.shirt = old_attendee.shirt
@@ -293,7 +294,7 @@ class Root:
         return {
             'id': id
         }
-    
+
     def cancel_repurchase(self, session, **params):
         PreregCart.unpaid_preregs.clear()
         if c.ATTENDEE_ACCOUNTS_ENABLED:
@@ -326,7 +327,7 @@ class Root:
         errors = check_if_can_reg(is_dealer_reg=True)
         if errors:
             return errors
-        
+
         force_form_defaults = True
 
         if c.DEALER_INVITE_CODE and not edit_id:
@@ -347,7 +348,7 @@ class Root:
         badges = params.get('badges', 0)
         attendee = group.attendees[0] if group.attendees else None
 
-        forms = load_forms(params, group, ['ContactInfo', 'TableInfo'], force_form_defaults=force_form_defaults)
+        forms = load_forms(params, group, ['ContactInfo', 'NewTableInfo'], force_form_defaults=force_form_defaults)
 
         if cherrypy.request.method == 'POST':
             for form in forms.values():
@@ -819,7 +820,7 @@ class Root:
             prereg_cart_error = cart.prereg_cart_checks(session)
             if prereg_cart_error:
                 raise HTTPRedirect('index?message={}', prereg_cart_error)
-            
+
             for attendee in cart.attendees:
                 receipt, receipt_items = ReceiptManager.create_new_receipt(attendee, who='non-admin', create_model=True,
                                                                            purchaser_id=cart.purchaser.id)
@@ -867,7 +868,7 @@ class Root:
             if pending_attendee and pending_attendee.badge_pickup_group_id:
                 pickup_group_id = pending_attendee.badge_pickup_group_id
         pending_attendee = None
-        
+
         if pickup_group_id:
             pickup_group = session.badge_pickup_group(pickup_group_id)
         else:
@@ -900,7 +901,7 @@ class Root:
                 if message:
                     message += f" Please click 'Edit' next to {attendee.full_name}'s registration to fix any issues."
                     break
-            
+
             if message:
                 return {'error': message}
 
@@ -1053,7 +1054,7 @@ class Root:
         session.commit()
 
         return {'message': 'Payment cancelled.'}
-    
+
     @ajax
     def cancel_payment_and_revert(self, session, stripe_id):
         last_receipt = None
@@ -1216,7 +1217,7 @@ class Root:
             return errors
         group = session.promo_code_group(id)
         count = int(count)
-        
+
         if int(estimated_cost) != count * c.GROUP_PRICE:
             raise HTTPRedirect(
                 'group_members?id={}&message={}',
@@ -1237,7 +1238,7 @@ class Root:
                                                              f'{count} extra badge{"s" if count > 1 else ""} '
                                                              f'for {group.name}',
                                                              count * c.GROUP_PRICE * 100))
-        
+
         session.add_codes_to_pc_group(group, count)
         session.commit()
 
@@ -1403,7 +1404,7 @@ class Root:
                 new_receipt = session.get_receipt_by_model(attendee, who='non-admin', create_if_none="DEFAULT")
                 if new_receipt.current_amount_owed and not new_receipt.pending_total:
                     raise HTTPRedirect(f'new_badge_payment?id={attendee.id}&return_to={return_to}')
-            raise HTTPRedirect('{}?id={}&message={}', 
+            raise HTTPRedirect('{}?id={}&message={}',
                                'group_members' if c.ATTENDEE_ACCOUNTS_ENABLED else 'badge_updated',
                                attendee.group.id if c.ATTENDEE_ACCOUNTS_ENABLED else attendee.id,
                                'Badge registered successfully.')
@@ -1447,7 +1448,7 @@ class Root:
                 'group_members?id={}&message={}',
                 attendee.group_id,
                 'Attendee successfully removed from the group.')
-        
+
         try:
             send_email.delay(
                 c.REGDESK_EMAIL,
@@ -1492,20 +1493,20 @@ class Root:
                 'group_members?id={}&message={}',
                 group.id,
                 'You cannot add fewer than {} badges to this group.'.format(group.min_badges_addable))
-        
+
         if group.is_dealer and count > group.dealer_badges_remaining:
             raise HTTPRedirect(
                 'group_members?id={}&message={}',
                 group.id,
                 'You cannot add more than {} badges'.format(group.dealer_badges_remaining))
-            
+
         receipt = session.get_receipt_by_model(group)
         if receipt:
             receipt_items = ReceiptManager.auto_update_receipt(group, receipt,
                                                                {'badges': count + group.badges,
                                                                 'auto_recalc': group.auto_recalc})
             session.add_all(receipt_items)
-        
+
         session.assign_badges(group, group.badges + count)
         session.commit()
         if group.auto_recalc:
@@ -1530,7 +1531,7 @@ class Root:
             uuid.UUID(confirmation_id)
         except ValueError:
             return {'success': False, 'message': f"Invalid confirmation ID format: {confirmation_id}"}
-        
+
         attendee = session.query(Attendee).filter(or_(Attendee.id == confirmation_id,
                                                       Attendee.public_id == confirmation_id),
                                                       Attendee.first_name == first_name.strip(),
@@ -1541,7 +1542,7 @@ class Root:
             return {'success': False, 'message': f"This is not a valid badge."}
         if attendee.group:
             return {'success': False, 'message': f"This badge is already in a group."}
-        
+
         group = session.group(id)
         attendee.group = group
         session.commit()
@@ -1604,7 +1605,7 @@ class Root:
             elif transfer_badges.count() > 1:
                 log.error(f"ERROR: {transfer_badges.count()} attendees have transfer code {transfer_code}!")
                 transfer_badge = transfer_badges.filter(Attendee.has_badge == True).first()
-                
+
         attendee = Attendee()
         form_list = ['PersonalInfo', 'OtherInfo', 'StaffingInfo', 'Consents']
         forms = load_forms(params, attendee, form_list)
@@ -1614,7 +1615,7 @@ class Root:
                 if hasattr(form, 'same_legal_name') and params.get('same_legal_name'):
                     form['legal_name'].data = ''
                 form.populate_obj(attendee)
-            
+
             if attendee.banned and not params.get('ban_bypass', None):
                 return {
                     'message': message,
@@ -1624,7 +1625,7 @@ class Root:
                     'code': transfer_code,
                     'ban_bypass': True,
                 }
-            
+
             if not params.get('duplicate_bypass', None):
                 duplicate = session.attendees_with_badges().filter_by(first_name=attendee.first_name,
                                                                       last_name=attendee.last_name,
@@ -1640,7 +1641,7 @@ class Root:
                         'ban_bypass': params.get('ban_bypass', None),
                         'duplicate_bypass': True,
                     }
-            
+
             if not message:
                 session.add(attendee)
                 attendee.badge_status = c.PENDING_STATUS
@@ -1668,7 +1669,7 @@ class Root:
             'forms': forms,
             'code': transfer_code,
         }
-    
+
     def complete_badge_transfer(self, session, id, code, message='', **params):
         if cherrypy.request.method != 'POST':
             raise HTTPRedirect('transfer_badge?id={}&message={}', id, "Please submit the form to transfer your badge.")
@@ -1678,7 +1679,7 @@ class Root:
         old = session.attendee(id)
         if not old.is_transferable:
             raise HTTPRedirect('../landing/index?message={}', 'This badge is not transferable.')
-        
+
         if not code:
             raise HTTPRedirect('transfer_badge?id={}&message={}', id, 'Please enter a transfer code.')
 
@@ -1692,11 +1693,11 @@ class Root:
             transfer_badge = transfer_badges.filter(Attendee.badge_status == c.PENDING_STATUS).first()
         else:
             transfer_badge = None
-        
+
         if not transfer_badge or transfer_badge.badge_status != c.PENDING_STATUS:
             raise HTTPRedirect('transfer_badge?id={}&message={}', id,
                                f"Could not find a badge to transfer to with transfer code {code}.")
-        
+
         old_attendee_dict = old.to_dict()
         del old_attendee_dict['id']
         for attr in old_attendee_dict:
@@ -1742,7 +1743,7 @@ class Root:
             session.add(receipt)
             receipt.owner_id = transfer_badge.id
             session.commit()
-        
+
         if c.ATTENDEE_ACCOUNTS_ENABLED:
             raise HTTPRedirect('../preregistration/homepage?message={}', "Badge transferred.")
         else:
@@ -1758,7 +1759,7 @@ class Root:
         if not old.has_badge:
             raise HTTPRedirect('../landing/index?message={}',
                                'This badge is no longer valid. It may have already been transferred.')
-        
+
         if not old.transfer_code:
             old.transfer_code = RegistrationCode.generate_random_code(Attendee.transfer_code)
             session.commit()
@@ -1793,7 +1794,7 @@ class Root:
                     'receipt': receipt,
                     'ban_bypass': True,
                 }
-            
+
             if not params.get('duplicate_bypass', None):
                 duplicate = session.attendees_with_badges().filter_by(first_name=attendee.first_name,
                                                                       last_name=attendee.last_name,
@@ -1911,7 +1912,7 @@ class Root:
 
         if isinstance(abandon_ids, str):
             abandon_ids = [abandon_ids]
-        
+
         if c.ATTENDEE_ACCOUNTS_ENABLED:
             account = session.current_attendee_account()
             if account.badges_needing_adults and set([a.id for a in account.valid_adults]).issubset(abandon_ids):
@@ -2265,12 +2266,16 @@ class Root:
                     return {"error": {'': ["We could not find the group you're trying to update."]}}
 
         if not form_list:
-            form_list = ['ContactInfo', 'TableInfo']
+            form_list = ['ContactInfo', 'NewTableInfo']
         elif isinstance(form_list, str):
             form_list = [form_list]
         forms = load_forms(params, group, form_list)
 
         all_errors = validate_model(forms, group)
+        if 'examples' in all_errors:
+            for upload in group.uploads:
+                uuid = upload.id
+                remove(f'{c.UPLOADED_FILES_DIR}/{uuid[:2]}/{uuid}')
         if all_errors:
             return {"error": all_errors}
 
@@ -2323,7 +2328,7 @@ class Root:
             col_names = [col_names]
         if isinstance(new_vals, six.string_types):
             new_vals = [new_vals]
-        
+
         update_col = params.get('update_col', col_names[-1])
 
         preview_attendee = Attendee(**attendee.to_dict())
@@ -2333,7 +2338,7 @@ class Root:
             if column is not None:
                 new_val = preview_attendee.coerce_column_data(column, new_val)
             setattr(preview_attendee, col_name, new_val)
-        
+
         changes_list = ReceiptManager.process_receipt_change(attendee, update_col,
                                                              who='non-admin',
                                                              new_model=preview_attendee)

@@ -3,12 +3,14 @@ from wtforms import (
     DecimalField,
     EmailField,
     IntegerField,
+    MultipleFileField,
     SelectField,
     SelectMultipleField,
     StringField,
     TelField,
     TextAreaField,
 )
+from wtforms.validators import Length
 
 from uber.config import c
 from uber.custom_tags import format_currency, pluralize
@@ -28,6 +30,7 @@ __all__ = [
     "ContactInfo",
     "GroupInfo",
     "LeaderInfo",
+    "NewTableInfo",
     "TableInfo",
 ]
 
@@ -114,6 +117,21 @@ class TableInfo(GroupInfo):
             count = f"{c.DEALER_DISCOUNTED_BADGES} badge{pluralize(c.DEALER_DISCOUNTED_BADGES)}"
             return f"{desc} The first {count} {verb} {price} (additional badges are {format_currency(c.DEALER_BADGE_PRICE)} each)."
         return desc
+
+
+class NewTableInfo(TableInfo):
+    """
+    Variant of TableInfo used only on preregistration.
+
+    This variant contains the examples file upload as file uploads are not
+    permitted after initial preregistration.
+    """
+    examples = MultipleFileField('Please upload 3-5 examples of works that ' +
+                                 'you plan on selling or examples of ' +
+                                 'previous table displays/setups. (Max 10MB ' +
+                                 'each, images only)',
+                                 [Length(3, 5, '3-5 images are required.')],
+                                 render_kw={'accept': 'image/*'})
 
 
 class AdminTableInfo(TableInfo, AdminGroupInfo):
