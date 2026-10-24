@@ -2258,6 +2258,7 @@ class Root:
                 group = session.group(id)
             except NoResultFound:
                 if is_prereg:
+                    new = True
                     group = self._get_unsaved(
                         id,
                         PreregCart.pending_dealers,

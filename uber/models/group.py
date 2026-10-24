@@ -531,6 +531,7 @@ class Group(MagModel, TakesPaymentMixin):
 
     @examples.setter
     def examples(self, files: list[Part]) -> None:
+        self.uploads.clear()
         for part in files:
             upload = Upload(mime=part.content_type.value)
             uuid = str(upload.id)
