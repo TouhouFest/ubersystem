@@ -531,10 +531,11 @@ class Group(MagModel, TakesPaymentMixin):
 
     @examples.setter
     def examples(self, files: list[Part]) -> None:
+        self.uploads.clear()
         for part in files:
             upload = Upload(mime=part.content_type.value)
             uuid = str(upload.id)
-            dir = f'uploaded_files/{uuid[:2]}'
+            dir = f'{c.UPLOADED_FILES_DIR}/{uuid[:2]}'
             makedirs(dir, 0o600, True)
             with open(f'{dir}/{uuid}', 'wb') as fp:
                 copyfileobj(part.file, fp)
