@@ -20,6 +20,12 @@
 
 <h2 class="h3 text-center mt-3">{{ c.DEALER_APP_TERM|title }} Info</h2>
 
+{% if c.EXHIBITOR_INFO_URL %}
+  <div class="alert alert-info" role="alert">
+    Please review the <a href="{{ c.EXHIBITOR_INFO_URL }}" target="_blank" rel="noopener noreferrer" class="alert-link">{{ c.DEALER_TERM|title }} Info</a> page before applying.
+  </div>
+{% endif %}
+
   {% include "forms/group/table_info.html" %}
 
 <h2 class="h3 text-center">{{ c.DEALER_TERM|title }} Contact Info</h2>
