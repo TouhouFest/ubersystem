@@ -119,7 +119,10 @@ class TableInfo(GroupInfo):
     def badges_desc(self):
         desc = "The number of people working your table, including yourself."
         if c.DEALER_DISCOUNTED_BADGES:
-            return f"{desc[:-1]} (discounted badges are included with your table; additional badges are {format_currency(c.DEALER_BADGE_PRICE)} each)."
+            return (
+                f"{desc[:-1]} (discounted badges are included with your table; "
+                f"additional badges are {format_currency(c.DEALER_BADGE_PRICE)} each)."
+            )
         return desc
 
 
