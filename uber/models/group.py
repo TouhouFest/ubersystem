@@ -361,7 +361,7 @@ class Group(MagModel, TakesPaymentMixin):
         The number of initial badges discounted for this dealer group, based on
         their vendor type (tables).
         """
-        return c.DEALER_DISCOUNTED_BADGES.get(int(self.tables or 0), 0) if self.is_dealer else 0
+        return c.DEALER_DISCOUNTED_BADGES.get(int(self.tables), 0) if self.is_dealer else 0
 
     @property
     def new_badge_cost(self):
