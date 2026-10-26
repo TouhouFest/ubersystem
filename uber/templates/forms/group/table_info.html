@@ -18,11 +18,40 @@
 Use these to add or rearrange fields. Remember to use {{ super() }} to print the original fields as-is.
 #}
 
-<div x-data="{ {% block x_data %}
-is_dealer: {{ group.is_dealer|tojson }},
-categories: {{ table_info.categories.data|map('string')|list }},
-get otherCategory() { return this.categories.includes('{{ c.OTHER }}') },
-{% endblock %} }">
+<script>
+  function tableInfo() {
+      return {
+        {% block x_data %}
+        is_dealer: {{ group.is_dealer|tojson }},
+        categories: {{ table_info.categories.data|map('string')|list }},
+        get otherCategory() { return this.categories.includes('{{ c.OTHER }}') },
+        {% if is_prereg_dealer %}
+        table_type: '{{ table_info.tables.data or (c.PREREG_TABLE_OPTS[0][0] if c.PREREG_TABLE_OPTS else 0) }}',
+        discounted_badges: {{ c.DEALER_DISCOUNTED_BADGES|tojson }},
+        discounted_price: {{ ('free' if not c.DEALER_DISCOUNTED_BADGE_PRICE else c.DEALER_DISCOUNTED_BADGE_PRICE|format_currency)|tojson }},
+        dealer_badge_price: {{ c.DEALER_BADGE_PRICE|format_currency|tojson }},
+        get badgeCount() {
+            return this.discounted_badges[this.table_type] || 0;
+        },
+        get badgeLabel() {
+            return this.badgeCount > 0
+                ? `Badges (First ${this.badgeCount} ${this.discounted_price}, then ${this.dealer_badge_price} each)`
+                : `Badges (${this.dealer_badge_price} each)`;
+        },
+        get badgeDesc() {
+            const base = 'The number of people working your table, including yourself.';
+            if (this.badgeCount <= 0) return base;
+            const verb = this.badgeCount > 1 ? 'are' : 'is';
+            const noun = this.badgeCount > 1 ? 'badges' : 'badge';
+            return `${base} The first ${this.badgeCount} ${noun} ${verb} ${this.discounted_price} (additional badges are ${this.dealer_badge_price} each).`;
+        },
+        {% endif %}
+        {% endblock %}
+      };
+  }
+</script>
+
+<div x-data="tableInfo()">
 
 {% set max_badges = c.MAX_DEALERS if group.is_dealer and c.MAX_DEALERS else c.MAX_GROUP_SIZE %}
 
@@ -69,10 +98,19 @@ get otherCategory() { return this.categories.includes('{{ c.OTHER }}') },
 <div class="row g-3 mb-3">
 {% block badges_tables %}
 {% if is_prereg_dealer %}
-        <div class="col-sm">{{ form_macros.input(table_info.tables, choices=c.PREREG_TABLE_OPTS, required=True) }}</div>
+        <div class="col-sm">{{ form_macros.input(table_info.tables, choices=c.PREREG_TABLE_OPTS, required=True, alpine_model="table_type") }}</div>
         <div class="col-sm">{{ form_macros.input(table_info.badges,
+                                            label_text=('<span x-text="badgeLabel">' ~ table_info.badges_label() ~ '</span>')|safe,
+                                            help_text=('<span x-text="badgeDesc">' ~ table_info.badges_desc() ~ '</span>')|safe,
                                             choices=int_choices(1, max_badges),
                                             required=True) }}
+            {% if c.DEALER_DISCOUNTED_BADGES %}
+            <noscript>
+                <div class="form-text">
+                    Discounted badge allocations vary by {{ c.DEALER_TERM }} type. See the <a href="{{ c.EXHIBITOR_INFO_URL or 'https://touhoufest.org/exhibitors-info' }}" target="_blank" rel="noopener noreferrer">{{ c.DEALER_TERM|title }} Info</a> page for full details.
+                </div>
+            </noscript>
+            {% endif %}
         </div>
 {% endif %}
 {% endblock %}

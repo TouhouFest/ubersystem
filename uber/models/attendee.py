@@ -1045,7 +1045,7 @@ class Attendee(MagModel, TakesPaymentMixin):
         elif self.is_dealer:
             if self.group and self.group.is_dealer:
                 attendees = self.group.sorted_attendees
-                if self in attendees and attendees.index(self) < c.DEALER_DISCOUNTED_BADGES:
+                if self in attendees and attendees.index(self) < self.group.dealer_discounted_badges:
                     return c.DEALER_DISCOUNTED_BADGE_PRICE
             return c.DEALER_BADGE_PRICE
         elif self.promo_code_groups or (self.group and self.group.auto_recalc and self.paid == c.PAID_BY_GROUP):

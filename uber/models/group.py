@@ -356,9 +356,17 @@ class Group(MagModel, TakesPaymentMixin):
         return total_badge_cost
 
     @property
+    def dealer_discounted_badges(self):
+        """
+        The number of initial badges discounted for this dealer group, based on
+        their vendor type (tables).
+        """
+        return c.DEALER_DISCOUNTED_BADGES.get(int(self.tables), 0) if self.is_dealer else 0
+
+    @property
     def new_badge_cost(self):
         if self.is_dealer:
-            return c.DEALER_DISCOUNTED_BADGE_PRICE if self.badges < c.DEALER_DISCOUNTED_BADGES else c.DEALER_BADGE_PRICE
+            return c.DEALER_DISCOUNTED_BADGE_PRICE if self.badges < self.dealer_discounted_badges else c.DEALER_BADGE_PRICE
         return c.get_group_price()
 
     @property

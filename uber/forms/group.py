@@ -103,19 +103,26 @@ class TableInfo(GroupInfo):
 
         return list(self._fields.keys())
 
+    @property
+    def dealer_discounted_badges(self):
+        """
+        The number of discounted badges included for the table/vendor type
+        selected on this form or configured for the underlying group.
+        """
+        return c.DEALER_DISCOUNTED_BADGES.get(int(self.tables.data or 0), 0)
+
     def badges_label(self):
         if c.DEALER_DISCOUNTED_BADGES:
-            price = "free" if not c.DEALER_DISCOUNTED_BADGE_PRICE else format_currency(c.DEALER_DISCOUNTED_BADGE_PRICE)
-            return f"Badges (First {c.DEALER_DISCOUNTED_BADGES} {price}, then {format_currency(c.DEALER_BADGE_PRICE)} each)"
-        return "Badges (" + format_currency(c.DEALER_BADGE_PRICE) + " each)"
+            return f"Badges (discounted with table, then {format_currency(c.DEALER_BADGE_PRICE)} each)"
+        return f"Badges ({format_currency(c.DEALER_BADGE_PRICE)} each)"
 
     def badges_desc(self):
         desc = "The number of people working your table, including yourself."
         if c.DEALER_DISCOUNTED_BADGES:
-            price = "free" if not c.DEALER_DISCOUNTED_BADGE_PRICE else format_currency(c.DEALER_DISCOUNTED_BADGE_PRICE)
-            verb = "are" if c.DEALER_DISCOUNTED_BADGES > 1 else "is"
-            count = f"{c.DEALER_DISCOUNTED_BADGES} badge{pluralize(c.DEALER_DISCOUNTED_BADGES)}"
-            return f"{desc} The first {count} {verb} {price} (additional badges are {format_currency(c.DEALER_BADGE_PRICE)} each)."
+            return (
+                f"{desc[:-1]} (discounted badges are included with your table; "
+                f"additional badges are {format_currency(c.DEALER_BADGE_PRICE)} each)."
+            )
         return desc
 
 
