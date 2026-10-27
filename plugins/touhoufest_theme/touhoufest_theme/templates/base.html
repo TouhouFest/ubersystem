@@ -510,6 +510,7 @@
         {% block content %}{% endblock %}
     </div>
     {% block footer %}
+    {% if not admin_area %}
     <footer class='py-5' style='background: var(--tf-navy);'>
         <div class='row' style='justify-content: space-around; margin: 0;'>
         <div class='col-2'>
@@ -552,6 +553,7 @@
         </div>
         </div>
     </footer>
+    {% endif %}
     {% endblock %}
     {% block scripts %}
         <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
