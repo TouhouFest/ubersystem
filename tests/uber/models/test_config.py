@@ -280,6 +280,98 @@ class TestDealerConfig:
 
         assert c.DEALER_APPS == 0
 
+    def test_dealer_reg_soft_closed_per_type(self, monkeypatch):
+        type_a, type_b = 101, 102
+        monkeypatch.setattr(c, 'DEALER_REG_DEADLINE', localized_now() + timedelta(days=1))
+        monkeypatch.setattr(c, 'MAX_DEALER_APPS', {type_a: 5, type_b: 2})
+        monkeypatch.setattr(uber.config.Config, 'TABLE_TYPES', [type_a, type_b])
+        monkeypatch.setattr(uber.config.Config, 'DEALER_APPS_BY_TYPE', {type_a: 4, type_b: 1})
+
+        assert not c.is_dealer_type_soft_closed(type_a)
+        assert not c.is_dealer_type_soft_closed(type_b)
+        assert not c.DEALER_REG_SOFT_CLOSED
+
+        # Cap reached for type_a only
+        monkeypatch.setattr(uber.config.Config, 'DEALER_APPS_BY_TYPE', {type_a: 5, type_b: 1})
+        assert c.is_dealer_type_soft_closed(type_a)
+        assert not c.is_dealer_type_soft_closed(type_b)
+        assert not c.DEALER_REG_SOFT_CLOSED
+
+        # Both caps reached
+        monkeypatch.setattr(uber.config.Config, 'DEALER_APPS_BY_TYPE', {type_a: 5, type_b: 2})
+        assert c.is_dealer_type_soft_closed(type_a)
+        assert c.is_dealer_type_soft_closed(type_b)
+        assert c.DEALER_REG_SOFT_CLOSED
+
+    def test_dealer_reg_soft_closed_per_type_uncapped(self, monkeypatch):
+        type_a, type_b = 101, 102
+        monkeypatch.setattr(c, 'DEALER_REG_DEADLINE', localized_now() + timedelta(days=1))
+        monkeypatch.setattr(c, 'MAX_DEALER_APPS', {type_a: 5, type_b: 0})
+        monkeypatch.setattr(uber.config.Config, 'TABLE_TYPES', [type_a, type_b])
+        monkeypatch.setattr(uber.config.Config, 'DEALER_APPS_BY_TYPE', {type_a: 5, type_b: 100})
+
+        assert c.is_dealer_type_soft_closed(type_a)
+        assert not c.is_dealer_type_soft_closed(type_b)
+        assert not c.DEALER_REG_SOFT_CLOSED
+
+    def test_prereg_table_opts_per_type(self, monkeypatch):
+        type_a, type_b = 101, 102
+        monkeypatch.setattr(c, 'DEALER_REG_DEADLINE', localized_now() + timedelta(days=1))
+        monkeypatch.setattr(c, 'MAX_DEALER_APPS', {type_a: 5, type_b: 2})
+        monkeypatch.setattr(uber.config.Config, 'TABLE_OPTS', [(type_a, 'Artist Alley'), (type_b, 'Dealer Booth')])
+        monkeypatch.setattr(c, 'VENDOR_PRICES', {type_a: 100, type_b: 250})
+
+        # Under cap
+        monkeypatch.setattr(uber.config.Config, 'DEALER_APPS_BY_TYPE', {type_a: 2, type_b: 1})
+        opts = c.PREREG_TABLE_OPTS
+        assert opts == [(type_a, 'Artist Alley, $100'), (type_b, 'Dealer Booth, $250')]
+        assert c.AVAILABLE_PREREG_TABLE_OPTS == [(type_a, 'Artist Alley, $100'), (type_b, 'Dealer Booth, $250')]
+
+        # type_a hits cap
+        monkeypatch.setattr(uber.config.Config, 'DEALER_APPS_BY_TYPE', {type_a: 5, type_b: 1})
+        opts = c.PREREG_TABLE_OPTS
+        assert opts == [(type_a, 'Artist Alley, $100 (Waitlist)'), (type_b, 'Dealer Booth, $250')]
+        assert c.AVAILABLE_PREREG_TABLE_OPTS == [(type_b, 'Dealer Booth, $250')]
+
+    def test_get_max_dealer_apps(self, monkeypatch):
+        # Dict config
+        monkeypatch.setattr(c, 'MAX_DEALER_APPS', {101: 5, 102: 10})
+        assert c.get_max_dealer_apps(101) == 5
+        assert c.get_max_dealer_apps(102) == 10
+        assert c.get_max_dealer_apps(999) == 0
+        assert c.get_max_dealer_apps() == 15
+
+        # Int config
+        monkeypatch.setattr(c, 'MAX_DEALER_APPS', 25)
+        assert c.get_max_dealer_apps(101) == 25
+        assert c.get_max_dealer_apps() == 25
+
+    def test_get_max_dealers(self, monkeypatch):
+        # Dict config
+        monkeypatch.setattr(c, 'MAX_DEALERS', {101: 2, 102: 6})
+        assert c.get_max_dealers(101) == 2
+        assert c.get_max_dealers(102) == 6
+        assert c.get_max_dealers(999) == 0
+        assert c.get_max_dealers() == 6
+
+        # Int config
+        monkeypatch.setattr(c, 'MAX_DEALERS', 20)
+        assert c.get_max_dealers(101) == 20
+        assert c.get_max_dealers() == 20
+
+    def test_dealer_apps_by_type(self):
+        session = Session().session
+        with request_cached_context():
+            session.add(Group(tables=101, cost=10, status=c.UNAPPROVED))
+            session.add(Group(tables=101, cost=10, status=c.UNAPPROVED))
+            session.add(Group(tables=102, cost=10, status=c.UNAPPROVED))
+            session.commit()
+
+        assert c.get_dealer_apps(101) == 2
+        assert c.get_dealer_apps(102) == 1
+        assert c.get_dealer_apps(999) == 0
+        assert c.DEALER_APPS == 3
+
 
 class TestMiscConfig:
     @pytest.mark.parametrize('cutoff,start,expected', [

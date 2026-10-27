@@ -151,14 +151,30 @@
                                 {% if not c.MAX_DEALERS %}"Custom" means it is dependent on the number of tables requested.{% endif %}
                             </span>
                         </td>
-                        <td>{{ c.MAX_DEALERS|default("Custom", True) }}</td>
+                        <td>
+                            {% if c.MAX_DEALERS is mapping %}
+                                {% for k, v in c.MAX_DEALERS.items() %}
+                                    {{ c.VENDOR_TYPES.get(k, k) }}: {{ v }}<br/>
+                                {% endfor %}
+                            {% else %}
+                                {{ c.MAX_DEALERS|default("Custom", True) }}
+                            {% endif %}
+                        </td>
                     </tr>
                     <tr>
                         <td>
                             {{ c.DEALER_TERM|title }} Application Limit
                             <br/><span class="form-text">The application closes once this number of applications has been submitted.</span>
                         </td>
-                        <td>{{ c.MAX_DEALER_APPS|default("Not Set", True) }}</td>
+                        <td>
+                            {% if c.MAX_DEALER_APPS is mapping %}
+                                {% for k, v in c.MAX_DEALER_APPS.items() %}
+                                    {{ c.VENDOR_TYPES.get(k, k) }}: {{ v }}<br/>
+                                {% endfor %}
+                            {% else %}
+                                {{ c.MAX_DEALER_APPS|default("Not Set", True) }}
+                            {% endif %}
+                        </td>
                     </tr>
                     <tr>
                         <td>

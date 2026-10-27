@@ -226,3 +226,36 @@ def test_group_badge_status_cascade():
     g.attendees = [taken, floating]
     g.presave_adjustments()
     assert taken.badge_status == c.COMPLETED_STATUS and floating.badge_status == c.NEW_STATUS
+
+
+def test_dealer_max_badges_per_type(monkeypatch):
+    monkeypatch.setattr(c, 'MAX_DEALERS', {101: 2, 102: 5})
+    assert Group(tables=101).dealer_max_badges == 2
+    assert Group(tables=102).dealer_max_badges == 5
+    # Unconfigured table type defaults to tables + 1
+    assert Group(tables=0).dealer_max_badges == 1
+
+
+def test_dealer_max_badges_global_int(monkeypatch):
+    monkeypatch.setattr(c, 'MAX_DEALERS', 15)
+    assert Group(tables=101).dealer_max_badges == 15
+    assert Group(tables=102).dealer_max_badges == 15
+
+
+def test_dealer_max_badges_fallback(monkeypatch):
+    monkeypatch.setattr(c, 'MAX_DEALERS', 0)
+    assert Group(tables=2).dealer_max_badges == 3
+    assert Group(tables=4).dealer_max_badges == 5
+
+
+def test_dealer_badges_remaining(monkeypatch):
+    monkeypatch.setattr(c, 'MAX_DEALERS', {101: 4})
+    group = Group(tables=101, status=c.APPROVED)
+    assert group.dealer_badges_remaining == 4
+
+    group.attendees = [Attendee(paid=c.PAID_BY_GROUP), Attendee(paid=c.PAID_BY_GROUP)]
+    assert group.dealer_badges_remaining == 2
+
+    # If waitlisted, badges remaining is 0
+    group.status = c.WAITLISTED
+    assert group.dealer_badges_remaining == 0

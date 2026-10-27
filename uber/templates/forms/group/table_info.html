@@ -30,6 +30,11 @@ Use these to add or rearrange fields. Remember to use {{ super() }} to print the
         discounted_badges: {{ c.DEALER_DISCOUNTED_BADGES|tojson }},
         discounted_price: {{ ('free' if not c.DEALER_DISCOUNTED_BADGE_PRICE else c.DEALER_DISCOUNTED_BADGE_PRICE|format_currency)|tojson }},
         dealer_badge_price: {{ c.DEALER_BADGE_PRICE|format_currency|tojson }},
+        max_dealers: {{ (c.MAX_DEALERS if c.MAX_DEALERS is mapping else {})|tojson }},
+        soft_closed_types: {{ {k: c.is_dealer_type_soft_closed(k) for k, _ in c.TABLE_OPTS}|tojson }},
+        get isSoftClosed() {
+            return !!this.soft_closed_types[this.table_type];
+        },
         get badgeCount() {
             return this.discounted_badges[this.table_type] || 0;
         },
@@ -53,7 +58,7 @@ Use these to add or rearrange fields. Remember to use {{ super() }} to print the
 
 <div x-data="tableInfo()">
 
-{% set max_badges = c.MAX_DEALERS if group.is_dealer and c.MAX_DEALERS else c.MAX_GROUP_SIZE %}
+{% set max_badges = (c.MAX_DEALERS.values()|max if c.MAX_DEALERS) if c.MAX_DEALERS is mapping else (c.MAX_DEALERS if group.is_dealer and c.MAX_DEALERS else c.MAX_GROUP_SIZE) %}
 
 <div class="row g-3 mb-3">
 {% block name_desc %}
@@ -67,10 +72,19 @@ Use these to add or rearrange fields. Remember to use {{ super() }} to print the
 
 {% block badges_js %}
 {% if is_prereg_dealer %}
-{% if not c.MAX_DEALERS %}
+{% if not c.MAX_DEALERS or c.MAX_DEALERS is mapping %}
   <script type="text/javascript">
   updateBadgeMax = function() {
-      var new_badge_max = Math.ceil(parseFloat($("select[name=tables]").val())) + 1;
+      var tableType = $("select[name=tables]").val();
+      var maxDealers = {{ (c.MAX_DEALERS if c.MAX_DEALERS is mapping else {})|tojson }};
+      var new_badge_max;
+      if (maxDealers[tableType]) {
+          new_badge_max = maxDealers[tableType];
+      } else if (!{{ 1 if c.MAX_DEALERS else 0 }}) {
+          new_badge_max = Math.ceil(parseFloat(tableType)) + 1;
+      } else {
+          new_badge_max = {{ c.MAX_DEALERS if c.MAX_DEALERS is number else c.MAX_GROUP_SIZE }};
+      }
       var curr_badge_max = parseInt($('select[name=badges] option:last').val()) || 0;
       if (new_badge_max && curr_badge_max > new_badge_max) {
           $("select[name=badges] option").slice(new_badge_max+1, curr_badge_max+1).remove();
@@ -98,7 +112,12 @@ Use these to add or rearrange fields. Remember to use {{ super() }} to print the
 <div class="row g-3 mb-3">
 {% block badges_tables %}
 {% if is_prereg_dealer %}
-        <div class="col-sm">{{ form_macros.input(table_info.tables, choices=c.PREREG_TABLE_OPTS, required=True, alpine_model="table_type") }}</div>
+        <div class="col-sm">
+            {{ form_macros.input(table_info.tables, choices=c.PREREG_TABLE_OPTS, required=True, alpine_model="table_type") }}
+            <div x-show="isSoftClosed" class="form-text text-warning" style="display: none;">
+                This {{ c.DEALER_TERM }} type is currently at capacity. Applications for this type will be waitlisted.
+            </div>
+        </div>
         <div class="col-sm">{{ form_macros.input(table_info.badges,
                                             label_text=('<span x-text="badgeLabel">' ~ table_info.badges_label() ~ '</span>')|safe,
                                             help_text=('<span x-text="badgeDesc">' ~ table_info.badges_desc() ~ '</span>')|safe,

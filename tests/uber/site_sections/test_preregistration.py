@@ -161,3 +161,42 @@ class TestRegisterGroupMember(object):
             # doesn't actually have a unique constraint on the badge_num
             # column. So we have to manually check for duplicate badge numbers.
             assert_unique(badge_nums)
+
+
+def test_finish_dealer_reg_soft_closed_per_type(monkeypatch):
+    from uber.payments import PreregCart
+    type_open, type_capped = 101, 102
+    monkeypatch.setattr(c, 'DEALER_REG_DEADLINE', localized_now() + timedelta(days=1))
+    monkeypatch.setattr(c, 'DEALER_REG_START', localized_now() - timedelta(days=1))
+    monkeypatch.setattr(c, 'DEALER_REG_SHUTDOWN', localized_now() + timedelta(days=2))
+    monkeypatch.setattr(c, 'MAX_DEALER_APPS', {type_open: 10, type_capped: 2})
+    monkeypatch.setattr(c, 'ATTENDEE_ACCOUNTS_ENABLED', False)
+    monkeypatch.setattr(c, 'NOTIFY_DEALER_APPLIED', False)
+
+    group_open = Group(is_dealer=True, tables=type_open)
+    attendee_open = Attendee(first_name='Open', last_name='Dealer', email='open@example.com')
+    group_open.attendees = [attendee_open]
+    group_open.badge_count = 1
+    PreregCart.pending_dealers[group_open.id] = group_open
+
+    monkeypatch.setattr(c, 'is_dealer_type_soft_closed', lambda t: t == type_capped)
+
+    session = Session().session
+    prereg = preregistration.Preregistration()
+    try:
+        prereg.finish_dealer_reg(session, group_open.id)
+    except HTTPRedirect:
+        pass
+    assert group_open.status == c.UNAPPROVED
+
+    group_capped = Group(is_dealer=True, tables=type_capped)
+    attendee_capped = Attendee(first_name='Capped', last_name='Dealer', email='capped@example.com')
+    group_capped.attendees = [attendee_capped]
+    group_capped.badge_count = 1
+    PreregCart.pending_dealers[group_capped.id] = group_capped
+
+    try:
+        prereg.finish_dealer_reg(session, group_capped.id)
+    except HTTPRedirect:
+        pass
+    assert group_capped.status == c.WAITLISTED

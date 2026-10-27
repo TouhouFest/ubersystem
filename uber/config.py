@@ -279,9 +279,13 @@ class _Overridable:
                 lookup[other_opt[0]] = other_opt[1]
 
         enum_name = enum_name.upper()
+        attr_name = enum_name + ('' if enum_name.endswith('S') else 'S')
         setattr(self, enum_name + '_OPTS', opts)
         setattr(self, enum_name + '_VARS', varnames)
-        setattr(self, enum_name + ('' if enum_name.endswith('S') else 'S'), lookup)
+        if attr_name in ('MAX_DEALERS', 'MAX_DEALER_APPS') and not lookup:
+            pass
+        else:
+            setattr(self, attr_name, lookup)
 
     def create_enum_val(self, name):
         val = int(sha512(name.upper().encode()).hexdigest()[:7], 16)
@@ -393,9 +397,44 @@ class Config(_Overridable):
     @property
     @dynamic
     def DEALER_REG_SOFT_CLOSED(self):
-        return self.AFTER_DEALER_REG_DEADLINE or self.DEALER_APPS >= self.MAX_DEALER_APPS \
-            if self.MAX_DEALER_APPS else self.AFTER_DEALER_REG_DEADLINE
-    
+        if self.AFTER_DEALER_REG_DEADLINE:
+            return True
+        if isinstance(self.MAX_DEALER_APPS, dict):
+            table_types = self.TABLE_TYPES
+            if not table_types:
+                return False
+            return all(self.is_dealer_type_soft_closed(t) for t in table_types)
+        return self.DEALER_APPS >= self.MAX_DEALER_APPS if self.MAX_DEALER_APPS else False
+
+    def is_dealer_type_soft_closed(self, table_type):
+        if self.AFTER_DEALER_REG_DEADLINE:
+            return True
+        if isinstance(self.MAX_DEALER_APPS, dict):
+            cap = self.MAX_DEALER_APPS.get(int(table_type or 0), 0)
+            if cap > 0:
+                return self.get_dealer_apps(table_type) >= cap
+            return False
+        if self.MAX_DEALER_APPS:
+            return self.DEALER_APPS >= self.MAX_DEALER_APPS
+        return False
+
+    def is_dealer_type_available(self, table_type):
+        return not self.is_dealer_type_soft_closed(table_type)
+
+    def get_max_dealer_apps(self, table_type=None):
+        if isinstance(self.MAX_DEALER_APPS, dict):
+            if table_type is not None:
+                return self.MAX_DEALER_APPS.get(int(table_type or 0), 0)
+            return sum(self.MAX_DEALER_APPS.values())
+        return self.MAX_DEALER_APPS or 0
+
+    def get_max_dealers(self, table_type=None):
+        if isinstance(self.MAX_DEALERS, dict):
+            if table_type is not None:
+                return self.MAX_DEALERS.get(int(table_type or 0), 0)
+            return max(self.MAX_DEALERS.values()) if self.MAX_DEALERS else 0
+        return self.MAX_DEALERS or 0
+
     @property
     def DEALER_INDEFINITE_TERM(self):
         if c.DEALER_TERM.startswith(("a", "e", "i", "o", "u")):
@@ -405,14 +444,33 @@ class Config(_Overridable):
 
     @property
     def TABLE_OPTS(self):
-        return [(key, name) for key, name in c.VENDOR_TYPES.items()]
+        vendor_types = getattr(c, 'VENDOR_TYPES', {})
+        return [(key, name) for key, name in vendor_types.items()]
+
+    @property
+    def TABLE_TYPES(self):
+        return [key for key, _ in self.TABLE_OPTS]
 
     @property
     def PREREG_TABLE_OPTS(self):
-        return [
-            (key, f'{name}, ${c.VENDOR_PRICES[key]}')
-            for key, name in c.TABLE_OPTS
-        ]
+        opts = []
+        vendor_prices = getattr(c, 'VENDOR_PRICES', {})
+        for key, name in self.TABLE_OPTS:
+            price = vendor_prices.get(key, 0)
+            if self.is_dealer_type_soft_closed(key):
+                opts.append((key, f'{name}, ${price} (Waitlist)'))
+            else:
+                opts.append((key, f'{name}, ${price}'))
+        return opts
+
+    @property
+    def AVAILABLE_PREREG_TABLE_OPTS(self):
+        opts = []
+        vendor_prices = getattr(c, 'VENDOR_PRICES', {})
+        for key, name in self.TABLE_OPTS:
+            if not self.is_dealer_type_soft_closed(key):
+                opts.append((key, f'{name}, ${vendor_prices.get(key, 0)}'))
+        return opts
 
     @property
     def ART_SHOW_OPEN(self):
@@ -468,6 +526,34 @@ class Config(_Overridable):
         with Session() as session:
             return session.query(Group).filter(
                 Group.tables > 0,
+                Group.cost > 0,
+                Group.status == self.UNAPPROVED).count()
+
+    @request_cached_property
+    @dynamic
+    def DEALER_APPS_BY_TYPE(self):
+        from sqlalchemy import func
+        from uber.models import Session, Group
+        with Session() as session:
+            rows = session.query(
+                Group.tables, func.count(Group.id)
+            ).filter(
+                Group.tables > 0,
+                Group.cost > 0,
+                Group.status == self.UNAPPROVED
+            ).group_by(Group.tables).all()
+            return {int(tables): count for tables, count in rows}
+
+    def get_dealer_apps(self, table_type=None):
+        if table_type is None:
+            return self.DEALER_APPS
+        apps_by_type = getattr(self, 'DEALER_APPS_BY_TYPE', None)
+        if isinstance(apps_by_type, dict) and int(table_type) in apps_by_type:
+            return apps_by_type[int(table_type)]
+        from uber.models import Session, Group
+        with Session() as session:
+            return session.query(Group).filter(
+                Group.tables == int(table_type),
                 Group.cost > 0,
                 Group.status == self.UNAPPROVED).count()
 

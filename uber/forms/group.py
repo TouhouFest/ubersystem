@@ -111,6 +111,16 @@ class TableInfo(GroupInfo):
         """
         return c.DEALER_DISCOUNTED_BADGES.get(int(self.tables.data or 0), 0)
 
+    @property
+    def dealer_max_badges(self):
+        """
+        The maximum number of badges allowed for the table/vendor type
+        selected on this form or configured for the underlying group.
+        """
+        if isinstance(c.MAX_DEALERS, dict):
+            return c.MAX_DEALERS.get(int(self.tables.data or 0), 0)
+        return c.MAX_DEALERS
+
     def badges_label(self):
         if c.DEALER_DISCOUNTED_BADGES:
             return f"Badges (discounted with table, then {format_currency(c.DEALER_BADGE_PRICE)} each)"
@@ -148,10 +158,11 @@ class AdminTableInfo(TableInfo, AdminGroupInfo):
     convert_badges = BooleanField("Convert this group's badges to individual badges.")
 
     def can_add_label(self):
-        if c.MAX_DEALERS:
-            return "This {} can add up to {} badges.".format(c.DEALER_TERM, c.MAX_DEALERS)
+        max_d = self.dealer_max_badges
+        if max_d:
+            return f"This {c.DEALER_TERM} can add up to {max_d} badges."
         else:
-            return "This {} can add badges up to their personal maximum.".format(c.DEALER_TERM)
+            return f"This {c.DEALER_TERM} can add badges up to their personal maximum."
 
 
 class LeaderInfo(MagForm):

@@ -438,7 +438,10 @@ class Group(MagModel, TakesPaymentMixin):
 
     @property
     def dealer_max_badges(self):
-        return c.MAX_DEALERS or math.ceil(self.tables) + 1
+        if isinstance(c.MAX_DEALERS, dict):
+            max_d = c.MAX_DEALERS.get(int(self.tables or 0), 0)
+            return max_d or (math.ceil(self.tables) + 1 if self.tables else 1)
+        return c.MAX_DEALERS or (math.ceil(self.tables) + 1 if self.tables else 1)
 
     @property
     def dealer_badges_remaining(self):

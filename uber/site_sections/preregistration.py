@@ -355,6 +355,14 @@ class Root:
 
             message = check(group, prereg=True)
             if not message:
+                table_opts = dict(c.TABLE_OPTS)
+                badge_num = int(badges or 0)
+                if table_opts and int(group.tables or 0) not in table_opts:
+                    message = f"Please select a valid {c.DEALER_TERM} type."
+                elif group.dealer_max_badges and badge_num > group.dealer_max_badges:
+                    message = f"You cannot select more than {group.dealer_max_badges} badges for this {c.DEALER_TERM} type."
+
+            if not message:
                 track_type = c.UNPAID_PREREG
 
                 if attendee:
@@ -371,6 +379,8 @@ class Root:
             if c.DEALER_REG_SOFT_CLOSED:
                 message = '{} is closed, but you can ' \
                     'fill out this form to add yourself to our waitlist'.format(c.DEALER_REG_TERM.title())
+            elif not message and any(c.is_dealer_type_soft_closed(k) for k, _ in c.TABLE_OPTS):
+                message = f'Some {c.DEALER_TERM} types are at capacity, but waitlist applications are being accepted.'
 
         return {
                 'logged_in_account': session.current_attendee_account(),
@@ -407,7 +417,7 @@ class Root:
         attendee.paid = c.PAID_BY_GROUP
         group.attendees = [attendee]
         session.assign_badges(group, group.badge_count)
-        group.status = c.WAITLISTED if c.DEALER_REG_SOFT_CLOSED else c.UNAPPROVED
+        group.status = c.WAITLISTED if (c.DEALER_REG_SOFT_CLOSED or c.is_dealer_type_soft_closed(group.tables)) else c.UNAPPROVED
         attendee.ribbon = add_opt(attendee.ribbon_ints, c.DEALER_RIBBON)
         attendee.badge_type = c.ATTENDEE_BADGE
 

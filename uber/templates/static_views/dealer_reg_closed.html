@@ -8,9 +8,13 @@
       <br/>
       {{ c.DEALER_REG_TERM|title }} was shut down {{ c.DEALER_REG_SHUTDOWN|datetime_local }}.
       <br/>
-    {% elif c.DEALER_APPS >= c.MAX_DEALER_APPS and c.MAX_DEALER_APPS > 0 %}
+    {% elif c.MAX_DEALER_APPS is number and c.MAX_DEALER_APPS > 0 and c.DEALER_APPS >= c.MAX_DEALER_APPS %}
       <br/>
       We have already received the maximum number of {{ c.DEALER_APP_TERM }}s ({{ c.MAX_DEALER_APPS }}) we are accepting this year.
+      <br/>
+    {% elif c.MAX_DEALER_APPS is mapping and c.DEALER_REG_SOFT_CLOSED %}
+      <br/>
+      We have already received the maximum number of {{ c.DEALER_APP_TERM }}s we are accepting this year.
       <br/>
     {% endif %}
     <br/>
