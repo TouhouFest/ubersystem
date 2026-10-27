@@ -23,7 +23,7 @@ Use these to add or rearrange fields. Remember to use {{ super() }} to print the
       return {
         {% block x_data %}
         is_dealer: {{ group.is_dealer|tojson }},
-        categories: {{ table_info.categories.data|map('string')|list }},
+        categories: {{ (table_info.categories.data or [])|map('string')|list|tojson }},
         get otherCategory() { return this.categories.includes('{{ c.OTHER }}') },
         {% if is_prereg_dealer %}
         table_type: '{{ table_info.tables.data or (c.PREREG_TABLE_OPTS[0][0] if c.PREREG_TABLE_OPTS else 0) }}',

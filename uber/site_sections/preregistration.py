@@ -1308,6 +1308,7 @@ class Root:
         return {
             'group':   group,
             'forms': forms,
+            'is_prereg_dealer': group.is_dealer,
             'locked_fields': [item for sublist in [form.get_non_admin_locked_fields(group) for form in forms.values()]
                               for item in sublist],
             'homepage_account': session.get_attendee_account_by_attendee(group.leader),
