@@ -27,10 +27,10 @@ class TestPriceBumps:
         assert 50 == c.get_attendee_price(datetime.now(UTC))
 
     def test_before_date_no_price_bump(self):
-        assert 40 == c.get_attendee_price((datetime.now(UTC) - timedelta(days=2)))
+        assert 40 == c.get_attendee_price(datetime.now(UTC) - timedelta(days=2))
 
     def test_on_date_no_price_bump(self):
-        assert 40 == c.get_attendee_price((datetime.now(UTC) - timedelta(days=1, hours=2)))
+        assert 40 == c.get_attendee_price(datetime.now(UTC) - timedelta(days=1, hours=2))
 
 
 class TestPriceLimits:
@@ -294,3 +294,89 @@ class TestMiscConfig:
         monkeypatch.setattr(c, 'REFUND_CUTOFF', cutoff)
         monkeypatch.setattr(c, 'REFUND_START', start)
         assert c.SELF_SERVICE_REFUNDS_OPEN == expected
+
+
+class TestSingleDayPriceBumps:
+    @pytest.fixture(autouse=True)
+    def setup_single_day_pricing(self, monkeypatch):
+        from collections import defaultdict
+
+        now = localized_now()
+        monkeypatch.setattr(c, "PRICE_BUMPS_ENABLED", True)
+        monkeypatch.setattr(c, "DEFAULT_SINGLE_DAY", 40)
+        monkeypatch.setattr(c, "INITIAL_ATTENDEE", 60)
+        monkeypatch.setattr(c, "DEALER_BADGE_PRICE", 200)
+        monkeypatch.setattr(
+            c,
+            "BADGE_PRICES",
+            {
+                "single_day": {"Saturday": 45, "Sunday": 30},
+                "price_ramps": {
+                    "attendee": {now - timedelta(days=1): 70},
+                    "Saturday": {now - timedelta(days=1): 55},
+                    "Sunday": {now + timedelta(days=5): 40},
+                },
+            },
+        )
+        monkeypatch.setattr(
+            c,
+            "PRICE_RAMPS",
+            defaultdict(
+                dict,
+                {
+                    "attendee": {now - timedelta(days=1): 70},
+                    "Saturday": {now - timedelta(days=1): 55},
+                    "Sunday": {now + timedelta(days=5): 40},
+                },
+            ),
+        )
+        monkeypatch.setattr(c, "PRICE_BUMPS", {now - timedelta(days=1): 70})
+        monkeypatch.setattr(c, "SATURDAY_AVAILABLE", True)
+        monkeypatch.setattr(c, "SUNDAY_AVAILABLE", True)
+        monkeypatch.setattr(c, "ATTENDEE_BADGE", 1)
+        monkeypatch.setattr(c, "SATURDAY", 101)
+        monkeypatch.setattr(c, "SUNDAY", 102)
+        monkeypatch.setattr(
+            c, "BADGES", {1: "Full Weekend", 101: "Saturday", 102: "Sunday"}
+        )
+
+    def test_single_day_price_bump_active(self):
+        now = localized_now()
+        assert 55 == c.get_oneday_price(dt=now, day_name="Saturday")
+
+    def test_single_day_price_bump_future(self):
+        now = localized_now()
+        assert 30 == c.get_oneday_price(dt=now, day_name="Sunday")
+
+    def test_single_day_presold_price(self):
+        now = localized_now()
+        assert 55 == c.get_presold_oneday_price(101, dt=now)
+        assert 30 == c.get_presold_oneday_price(102, dt=now)
+
+    def test_single_day_opt_returns_bumped_price(self):
+        now = localized_now()
+        opt = c.single_day_opt("Saturday", dt=now)
+        assert opt["price"] == 55
+
+    def test_price_bumps_disabled(self, monkeypatch):
+        monkeypatch.setattr(c, "PRICE_BUMPS_ENABLED", False)
+        now = localized_now()
+        assert 45 == c.get_oneday_price(dt=now, day_name="Saturday")
+
+    def test_get_badge_price_helper(self):
+        now = localized_now()
+        # Weekend attendee badge by various aliases
+        assert 70 == c.get_badge_price("attendee", dt=now)
+        assert 70 == c.get_badge_price("Attendee", dt=now)
+        assert 70 == c.get_badge_price("Full Weekend", dt=now)
+        assert 70 == c.get_badge_price(1, dt=now)
+
+        # Single-day badges
+        assert 55 == c.get_badge_price("Saturday", dt=now)
+        assert 55 == c.get_badge_price("saturday", dt=now)
+        assert 55 == c.get_badge_price("Saturday Badge", dt=now)
+        assert 55 == c.get_badge_price(101, dt=now)
+        assert 30 == c.get_badge_price("Sunday", dt=now)
+
+        # Dealer badge
+        assert 200 == c.get_badge_price("dealer", dt=now)
