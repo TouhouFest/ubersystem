@@ -546,5 +546,6 @@ class Group(MagModel, TakesPaymentMixin):
             dir = f'{c.UPLOADED_FILES_DIR}/{uuid[:2]}'
             makedirs(dir, 0o600, True)
             with open(f'{dir}/{uuid}', 'wb') as fp:
+                part.file.seek(0)
                 copyfileobj(part.file, fp)
             self.uploads.append(upload)
