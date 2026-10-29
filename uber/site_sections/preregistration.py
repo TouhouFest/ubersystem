@@ -1,13 +1,12 @@
 import json
-import six
 import uuid
+from collections import defaultdict
 from datetime import datetime, timedelta
 from functools import wraps
-from uber.models.admin import PasswordReset
 
 import bcrypt
 import cherrypy
-from collections import defaultdict
+import six
 from pockets import listify
 from pockets.autolog import log
 from sqlalchemy import func, or_
@@ -15,16 +14,50 @@ from sqlalchemy.orm.exc import NoResultFound
 
 from uber.config import c
 from uber.custom_tags import email_only, readable_join
-from uber.decorators import ajax, ajax_gettable, all_renderable, credit_card, csrf_protected, id_required, log_pageview, \
-    redirect_if_at_con_to_kiosk, render, requires_account
+from uber.decorators import (
+    ajax,
+    ajax_gettable,
+    all_renderable,
+    credit_card,
+    csrf_protected,
+    id_required,
+    log_pageview,
+    redirect_if_at_con_to_kiosk,
+    render,
+    requires_account,
+)
 from uber.errors import HTTPRedirect
 from uber.forms import load_forms
-from uber.models import Attendee, AttendeeAccount, Attraction, BadgePickupGroup, Email, Group, PromoCode, PromoCodeGroup, \
-                        ModelReceipt, ReceiptItem, ReceiptTransaction, Tracking
+from uber.models import (
+    Attendee,
+    AttendeeAccount,
+    Attraction,
+    BadgePickupGroup,
+    Email,
+    Group,
+    PromoCode,
+    PromoCodeGroup,
+    ReceiptTransaction,
+    Tracking,
+)
+from uber.models.admin import PasswordReset
+from uber.payments import PreregCart, ReceiptManager, RefundRequest, TransactionRequest
+from uber.signature_service import get_esign_request
 from uber.tasks.email import send_email
-from uber.utils import add_opt, remove_opt, check, localized_now, normalize_email, normalize_email_legacy, genpasswd, valid_email, \
-    valid_password, SignNowRequest, validate_model, create_new_hash, get_age_conf_from_birthday, RegistrationCode
-from uber.payments import PreregCart, TransactionRequest, ReceiptManager, RefundRequest
+from uber.utils import (
+    RegistrationCode,
+    add_opt,
+    check,
+    create_new_hash,
+    genpasswd,
+    get_age_conf_from_birthday,
+    localized_now,
+    normalize_email,
+    normalize_email_legacy,
+    valid_email,
+    valid_password,
+    validate_model,
+)
 
 
 def check_if_can_reg(is_dealer_reg=False):
@@ -1257,29 +1290,42 @@ class Root:
 
         forms = load_forms(params, group, form_list)
 
-        signnow_document = None
-        signnow_link = ''
+        esign_document = None
+        esign_link = ""
 
-        if group.is_dealer and c.SIGNNOW_DEALER_TEMPLATE_ID and group.is_valid and group.status in c.DEALER_ACCEPTED_STATUSES:
-            signnow_request = SignNowRequest(session=session, group=group, ident="terms_and_conditions",
-                                             create_if_none=True)
+        if (
+            group.is_dealer
+            and c.ESIGN_DEALER_TEMPLATE_ID
+            and group.is_valid
+            and group.status in c.DEALER_ACCEPTED_STATUSES
+        ):
+            esign_request = get_esign_request(
+                session=session,
+                group=group,
+                ident="terms_and_conditions",
+                create_if_none=True,
+            )
 
-            if not signnow_request.error_message:
-                signnow_document = signnow_request.document
-                session.add(signnow_document)
+            if not esign_request.error_message:
+                esign_document = esign_request.document
+                session.add(esign_document)
 
-                signnow_link = signnow_document.link
+                esign_link = esign_document.link
 
-                if not signnow_document.signed:
-                    signed = signnow_request.get_doc_signed_timestamp()
+                if not esign_document.signed:
+                    signed = esign_request.get_doc_signed_timestamp()
                     if signed:
-                        signnow_document.signed = datetime.fromtimestamp(int(signed))
-                        signnow_link = ''
-                        signnow_document.link = signnow_link
-                    elif not signnow_link:
-                        signnow_link = signnow_request.create_dealer_signing_link()
-                        if not signnow_request.error_message:
-                            signnow_document.link = signnow_link
+                        from datetime import UTC
+
+                        esign_document.signed = datetime.fromtimestamp(
+                            int(signed), tz=UTC
+                        )
+                        esign_link = ""
+                        esign_document.link = esign_link
+                    elif not esign_link:
+                        esign_link = esign_request.create_dealer_signing_link()
+                        if not esign_request.error_message:
+                            esign_document.link = esign_link
 
                 session.commit()
 
@@ -1306,18 +1352,25 @@ class Root:
             raise HTTPRedirect('group_payment?id={}', group.id)
 
         return {
-            'group':   group,
-            'forms': forms,
-            'is_prereg_dealer': group.is_dealer,
-            'locked_fields': [item for sublist in [form.get_non_admin_locked_fields(group) for form in forms.values()]
-                              for item in sublist],
-            'homepage_account': session.get_attendee_account_by_attendee(group.leader),
-            'logged_in_account': session.current_attendee_account(),
-            'signnow_document': signnow_document,
-            'signnow_link': signnow_link,
-            'receipt': receipt,
-            'incomplete_txn': receipt.get_last_incomplete_txn() if receipt else None,
-            'message': message
+            "group": group,
+            "forms": forms,
+            "is_prereg_dealer": group.is_dealer,
+            "locked_fields": [
+                item
+                for sublist in [
+                    form.get_non_admin_locked_fields(group) for form in forms.values()
+                ]
+                for item in sublist
+            ],
+            "homepage_account": session.get_attendee_account_by_attendee(group.leader),
+            "logged_in_account": session.current_attendee_account(),
+            "esign_document": esign_document,
+            "esign_link": esign_link,
+            "signnow_document": esign_document,
+            "signnow_link": esign_link,
+            "receipt": receipt,
+            "incomplete_txn": receipt.get_last_incomplete_txn() if receipt else None,
+            "message": message,
         }
 
     @id_required(Group)
@@ -1380,22 +1433,28 @@ class Root:
                 'permitted to upload files.'
             )
 
-    def download_signnow_document(self, session, id, return_to='../preregistration/group_members'):
+    @requires_account(Group)
+    def download_esign_document(
+        self, session, id, return_to="../preregistration/group_members"
+    ):
         group = session.group(id)
-        signnow_request = SignNowRequest(session=session, group=group)
-        if signnow_request.error_message:
+        esign_request = get_esign_request(session=session, group=group)
+        if esign_request.error_message:
             raise HTTPRedirect(return_to + "?id={}&message={}", id,
                                "We're having an issue fetching this document link. Please try again later!")
-        elif signnow_request.document:
-            if signnow_request.document.signed:
-                download_link = signnow_request.get_download_link()
-                if not signnow_request.error_message:
+        elif esign_request.document:
+            if esign_request.document.signed:
+                download_link = esign_request.get_download_link()
+                if not esign_request.error_message:
                     raise HTTPRedirect(download_link)
             raise HTTPRedirect(return_to + "?id={}&message={}", id,
                                "We don't have a record of this document being signed.")
         raise HTTPRedirect(return_to + "?id={}&message={}", id, "We don't have a record of a document for this group.")
 
-    def register_group_member(self, session, group_id, message='', **params):
+    download_signnow_document = download_esign_document
+
+    @requires_account()
+    def register_group_member(self, session, group_id, message="", **params):
         group = session.group(group_id, ignore_csrf=True)
         if params.get('id') in [None, '', 'None']:
             attendee = group.unassigned[0] if group.unassigned else None
@@ -1637,8 +1696,8 @@ class Root:
                            group.leader.id, message)
 
     def purchase_dealer_badge(self, session, id):
-        from uber.site_sections.dealer_admin import convert_dealer_badge
         from uber.custom_tags import datetime_local_filter
+        from uber.site_sections.dealer_admin import convert_dealer_badge
         attendee = session.attendee(id)
         convert_dealer_badge(session, attendee, f"Self-purchased dealer badge {datetime_local_filter(datetime.now())}.")
         session.add(attendee)
