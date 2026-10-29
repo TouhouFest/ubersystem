@@ -191,6 +191,7 @@ class JinjaEnv:
             'lstrip_blocks': True,
             'trim_blocks': True,
             'keep_trailing_newline': True,
+            'extensions': ['jinja2.ext.do']
         }
         params.update(kwargs)
 

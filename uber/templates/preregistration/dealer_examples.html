@@ -1,0 +1,25 @@
+{% extends "./preregistration/preregbase.html" %}
+{% set page_ro = group.status not in c.DEALER_EDITABLE_STATUSES %}
+{% import 'forms/macros.html' as form_macros with context %}
+{% set title_text = "Update " ~ c.DEALER_APP_TERM | title ~ " Examples" %}
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    Update Examples
+  </div>
+  <div class="card-body">
+    {% include 'confirm_tabs.html' with context %}
+
+    <h2>Examples</h2>
+    {{ form_macros.form_validation('examples-form', 'validate_dealer_examples') }}
+    <form method="post" id="examples-form" action="dealer_examples" role="form" enctype="multipart/form-data">
+      {{ csrf_token() }}
+      <input type="hidden" name="id" value="{{ group.id }}">
+      <div class="row g-3 mb-3">{{ form_macros.input(examples_upload.examples) }}</div>
+      {% if group.status in c.DEALER_EDITABLE_STATUSES %}
+      <button type="submit" class="btn btn-primary" value="Update Application">Update Application</button>
+      {% endif %}
+    </form>
+  </div>
+</div>
+{% endblock %}

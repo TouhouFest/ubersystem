@@ -141,7 +141,10 @@
   {{ text_below_field }}
 </fieldset>
 {% else %}
-  {% if 'FileInput' in widget and field.data %}<p>{{ field.data }}</p>{% endif %}
+  {% if 'FileInput' in widget %}
+  {% if field.data %}<p>{{ field.data }}</p>{% endif %}
+  {% if custom_kwargs['readonly'] %}{% do custom_kwargs.update({'disabled': ''}) %}{% endif %}
+  {% endif %}
   {{ field(**custom_kwargs) }}
   {{ text_below_field }}
   {% if caller %}{{ caller() }}{% endif %}
