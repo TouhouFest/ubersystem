@@ -1,6 +1,6 @@
-import pytz
+from datetime import UTC, datetime, timedelta
 
-from datetime import datetime, timedelta
+import pytz
 from celery.schedules import crontab
 from pockets.autolog import log
 from sqlalchemy.orm.exc import NoResultFound
@@ -8,10 +8,10 @@ from sqlalchemy.orm.exc import NoResultFound
 from uber.config import c
 from uber.decorators import render
 from uber.models import Group, GuestGroup, GuestMerch, Session
+from uber.signature_service import get_esign_request
 from uber.tasks import celery
 from uber.tasks.email import send_email
-from uber.utils import SignNowRequest, localized_now
-
+from uber.utils import localized_now
 
 __all__ = ['check_document_signed', 'convert_declined_groups']
 
@@ -19,7 +19,8 @@ __all__ = ['check_document_signed', 'convert_declined_groups']
 @celery.schedule(crontab(minute=0, hour='*/6'))
 def check_document_signed():
     from uber.models import SignedDocument
-    if not c.SIGNNOW_DEALER_TEMPLATE_ID:
+
+    if not c.ESIGN_DEALER_TEMPLATE_ID:
         return
     with Session() as session:
         for document in session.query(SignedDocument).filter_by(model="Group"):
@@ -29,13 +30,15 @@ def check_document_signed():
                 except NoResultFound:
                     log.debug(f"Signed document {document.id} is dangling, group f{document.fk_id} not found.")
                 else:
-                    signnow_request = SignNowRequest(session=session, group=group)
-                    signed = signnow_request.get_doc_signed_timestamp()
+                    esign_request = get_esign_request(session=session, group=group)
+                    signed = esign_request.get_doc_signed_timestamp()
                     if signed:
-                        signnow_request.document.signed = datetime.fromtimestamp(int(signed))
-                        signnow_link = ''
-                        signnow_request.document.link = signnow_link
-                        session.add(signnow_request.document)
+                        esign_request.document.signed = datetime.fromtimestamp(
+                            int(signed), tz=UTC
+                        )
+                        esign_link = ""
+                        esign_request.document.link = esign_link
+                        session.add(esign_request.document)
                         session.commit()
 
 

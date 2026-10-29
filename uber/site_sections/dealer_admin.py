@@ -1,5 +1,6 @@
-import cherrypy
 from datetime import datetime
+
+import cherrypy
 from pockets.autolog import log
 from pytz import UTC
 from sqlalchemy.orm import subqueryload
@@ -10,8 +11,9 @@ from uber.decorators import ajax, all_renderable, render
 from uber.errors import HTTPRedirect
 from uber.models import Attendee, Group
 from uber.payments import ReceiptManager
+from uber.signature_service import get_esign_request
 from uber.tasks.email import send_email
-from uber.utils import remove_opt, SignNowRequest
+from uber.utils import remove_opt
 
 
 def convert_dealer_badge(session, attendee, admin_note=''):
@@ -229,19 +231,28 @@ class Root:
         session.commit()
         return {'success': True,
                 'message': message}
-    
-    def send_signnow_link(self, session, id):
+
+    def send_esign_link(self, session, id):
         group = session.group(id)
 
-        signnow_request = SignNowRequest(session=session, group=group, create_if_none=True)
-        signnow_request.send_dealer_signing_invite()
-        if signnow_request.error_message:
-            raise HTTPRedirect("../group_admin/form?id={}&message={}", id,
-                               f"Error sending SignNow link: {signnow_request.error_message}")
+        esign_request = get_esign_request(
+            session=session, group=group, create_if_none=True
+        )
+        esign_request.send_dealer_signing_invite()
+        if esign_request.error_message:
+            raise HTTPRedirect(
+                "../group_admin/form?id={}&message={}",
+                id,
+                f"Error sending e-signature link: {esign_request.error_message}",
+            )
         else:
-            signnow_request.document.last_emailed = datetime.now(UTC)
-            session.add(signnow_request.document)
-            raise HTTPRedirect("../group_admin/form?id={}&message={}", id, "SignNow link sent!")
+            esign_request.document.last_emailed = datetime.now(UTC)
+            session.add(esign_request.document)
+            raise HTTPRedirect(
+                "../group_admin/form?id={}&message={}", id, "E-signature link sent!"
+            )
+
+    send_signnow_link = send_esign_link
 
     @ajax
     def set_table_shared(self, session, id, shared_group_name, **params):
