@@ -136,7 +136,11 @@ class ExamplesUpload(MagForm):
                                  'previous table displays/setups. (Max 10MB ' +
                                  'each, images only)',
                                  [Length(3, 5, '3-5 images are required.')],
-                                 render_kw={'accept': 'image/*'})
+                                 render_kw={
+                                     'accept': 'image/*',
+                                     'data-max-size': 10 * 1024 * 1024,
+                                     'data-max-total-size': 50 * 1024 * 1024,
+                                 })
 
     def get_non_admin_locked_fields(self, group: Group) -> list[str]:
         return [] if group.is_new or group.status in \

@@ -335,7 +335,7 @@
 <script type="text/javascript">
   serverValidationPassed = false;
   
-  var runServerValidations_{{ form_id|replace('-','_') }} = function($form, submit_button_name, submit_button_val) {
+  var runServerValidations_{{ form_id|replace('-','_') }} = async function($form, submit_button_name, submit_button_val) {
     var form_data = new FormData($('#{{ form_id }}')[0]);
     var form_list = {{ form_list|safe }};
     form_list.forEach((item) => form_data.append("form_list", item))
@@ -344,13 +344,64 @@
     }
     $('.invalid-feedback').hide();
     $(':input').removeClass("is-invalid");
-    $.ajax({
-      method: 'POST',
-      url: "{{ page_handler }}",
-      data: form_data,
-      processData: false,
-      contentType: false,
-      success: function (response) {
+
+    var showAlert = function(msg, isHtml) {
+      var el = document.getElementById('form-validations-{{ form_id }}');
+      if (el) {
+        el.className = 'alert alert-danger';
+        el.querySelector('span')[isHtml ? 'innerHTML' : 'textContent'] = msg;
+        el.style.display = '';
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    };
+
+    var fileInputs = document.querySelectorAll('#{{ form_id }} input[type="file"]');
+    var fileErrors = [];
+    var totalBytes = 0;
+    var maxTotalBytes = 50 * 1024 * 1024;
+
+    fileInputs.forEach(function(input) {
+      var maxFileBytes = parseInt(input.dataset.maxSize, 10) || 10 * 1024 * 1024;
+      if (input.dataset.maxTotalSize) {
+        maxTotalBytes = parseInt(input.dataset.maxTotalSize, 10);
+      }
+      for (var file of input.files || []) {
+        totalBytes += file.size;
+        if (file.size > maxFileBytes) {
+          fileErrors.push('File "' + file.name + '" exceeds the maximum size limit of ' + Math.round(maxFileBytes / 1048576) + 'MB.');
+          input.classList.add('is-invalid');
+        }
+      }
+    });
+
+    if (totalBytes > maxTotalBytes) {
+      fileErrors.push('Total file upload size (' + (totalBytes / 1048576).toFixed(1) + 'MB) exceeds the maximum limit of ' + Math.round(maxTotalBytes / 1048576) + 'MB.');
+      fileInputs.forEach(input => input.classList.add('is-invalid'));
+    }
+
+    if (fileErrors.length > 0) {
+      showAlert('Please correct the following errors:<ul>' +
+        fileErrors.map(err => '<li>' + err + '</li>').join('') + '</ul>', true);
+      return false;
+    }
+
+    var response;
+    try {
+      var res = await fetch("{{ page_handler }}", {
+        method: 'POST',
+        body: form_data,
+        headers: { 'Accept': 'application/json' }
+      });
+      if (res.status === 413) {
+        return showAlert("The files you uploaded are too large. Please reduce the image sizes and try again.", false);
+      }
+      if (res.status === 504 || res.status === 408) {
+        return showAlert("The request timed out. Please check your connection and try again.", false);
+      }
+      response = await res.json();
+    } catch (e) {
+      return showAlert("An error occurred while validating the form. Please try again.", false);
+    }
         $("#form-validations-{{ form_id }}").hide().removeClass().addClass("alert").children('span').html("");
         $(".is-invalid").each(function() {
           var field_id = $(this).attr('id');
@@ -412,8 +463,6 @@
           }
           {% endif %}
         }
-      }
-    });
   };
   
 
