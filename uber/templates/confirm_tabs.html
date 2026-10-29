@@ -31,6 +31,13 @@
       <i class="fa fa-briefcase"></i> {% if attendee.group.is_dealer %}Dealer Application{% else %}Manage {{ attendee.group.name }}{% endif %}
     </a>
   </li>
+  {% if attendee.group.is_dealer %}
+  <li class="nav-item" role="presentation">
+    <a href="../preregistration/dealer_examples?id={{ attendee.group.id }}" class="nav-link{% if 'dealer_examples' in c.PAGE_PATH %} active{% endif %}">
+      <i class="fa fa-image"></i> Dealer Examples
+    </a>
+  </li>
+  {% endif %}
   {% endif %}
   <li class="nav-item" role="presentation">
     <a href="../preregistration/confirm?id={{ attendee.id }}" class="nav-link{% if 'confirm' in c.PAGE_PATH %} active{% endif %}">

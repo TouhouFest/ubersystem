@@ -1320,6 +1320,66 @@ class Root:
             'message': message
         }
 
+    @id_required(Group)
+    @requires_account(Group)
+    @log_pageview
+    def dealer_examples(self, session, id, message='', **params):
+        group = session.group(id)
+        if group.is_dealer:
+            forms = load_forms(params, group, ['ExamplesUpload'])
+            examples_upload = next(forms.values())
+
+            if cherrypy.request.method == 'POST':
+                if group.status not in c.DEALER_EDITABLE_STATUSES:
+                    raise HTTPRedirect(
+                        f'dealer_examples?id={id}&message=Your group may ' +
+                        'not update your examples at this time.'
+                    )
+                elif validate_model(forms, group):
+                    raise HTTPRedirect(
+                        f'dealer_examples?id={id}&message=Your files did ' +
+                        'not pass server validation.'
+                    )
+                else:
+                    examples_upload.populate_obj(group)
+                    session.commit()
+                    send_email.delay(
+                        c.MARKETPLACE_EMAIL,
+                        c.MARKETPLACE_NOTIFICATIONS_EMAIL,
+                        f'{c.DEALER_APP_TERM.title()} Changed',
+                        render(
+                            'emails/dealers/appchange_notification.html',
+                            {'group': group}, encoding=None
+                        ),
+                        'html',
+                        model=group.to_dict('id'))
+                    raise HTTPRedirect(
+                        f'dealer_examples?id={id}&message=Thank you! ' +
+                        'The examples for your application have been ' +
+                        'updated.'
+                    )
+
+            return {
+                'attendee': group.leader,
+                'group': group,
+                'examples_upload': examples_upload,
+                'is_prereg_dealer': group.is_dealer,
+                'locked_fields': [
+                    item for item in
+                    examples_upload.get_non_admin_locked_fields(group)
+                ],
+                'homepage_account': session.get_attendee_account_by_attendee(
+                    group.leader
+                ),
+                'logged_in_account': session.current_attendee_account(),
+                'message': message
+            }
+        else:
+            raise HTTPRedirect(
+                f'group_members?id={id}&message=Your group is not ' +
+                'permitted to upload files.'
+            )
+
     def download_signnow_document(self, session, id, return_to='../preregistration/group_members'):
         group = session.group(id)
         signnow_request = SignNowRequest(session=session, group=group)
@@ -2273,6 +2333,22 @@ class Root:
         elif isinstance(form_list, str):
             form_list = [form_list]
         forms = load_forms(params, group, form_list)
+
+        all_errors = validate_model(forms, group)
+        if all_errors:
+            return {"error": all_errors}
+
+        return {"success": True}
+
+    @ajax
+    def validate_dealer_examples(self, session, **params):
+        id = params.get('id', params.get('edit_id'))
+        try:
+            group = session.group(id)
+        except NoResultFound:
+            return {"error": {'': ["We could not find the group you're trying to update."]}}
+
+        forms = load_forms(params, group, ['ExamplesUpload'])
 
         all_errors = validate_model(forms, group)
         if all_errors:

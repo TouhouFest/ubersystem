@@ -23,6 +23,7 @@ from uber.forms import (
     NumberInputGroup,
     SelectBooleanField,
 )
+from uber.models import Group
 
 __all__ = [
     "AdminGroupInfo",
@@ -126,12 +127,9 @@ class TableInfo(GroupInfo):
         return desc
 
 
-class NewTableInfo(TableInfo):
+class ExamplesUpload(MagForm):
     """
-    Variant of TableInfo used only on preregistration.
-
-    This variant contains the examples file upload as file uploads are not
-    permitted after initial preregistration.
+    Form used for collecting example file uploads during dealer registration.
     """
     examples = MultipleFileField('Please upload 3-5 examples of works that ' +
                                  'you plan on selling or examples of ' +
@@ -139,6 +137,19 @@ class NewTableInfo(TableInfo):
                                  'each, images only)',
                                  [Length(3, 5, '3-5 images are required.')],
                                  render_kw={'accept': 'image/*'})
+
+    def get_non_admin_locked_fields(self, group: Group) -> list[str]:
+        return [] if group.is_new or group.status in \
+            c.DEALER_EDITABLE_STATUSES else ['examples']
+
+
+class NewTableInfo(TableInfo, ExamplesUpload):
+    """
+    Variant of TableInfo used only on preregistration.
+
+    This variant contains the examples file upload as file uploads are not
+    permitted after initial preregistration.
+    """
 
 
 class AdminTableInfo(TableInfo, AdminGroupInfo):
