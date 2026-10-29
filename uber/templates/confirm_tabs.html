@@ -28,13 +28,13 @@
   {% if attendee.is_group_leader and attendee.group %}
   <li class="nav-item" role="presentation">
     <a href="../preregistration/group_members?id={{ attendee.group.id }}" class="nav-link{% if 'group_members' in c.PAGE_PATH %} active{% endif %}">
-      <i class="fa fa-briefcase"></i> {% if attendee.group.is_dealer %}Dealer Application{% else %}Manage {{ attendee.group.name }}{% endif %}
+      <i class="fa fa-briefcase"></i> {% if attendee.group.is_dealer %}{{ c.DEALER_TERM | title }} Application{% else %}Manage {{ attendee.group.name }}{% endif %}
     </a>
   </li>
   {% if attendee.group.is_dealer %}
   <li class="nav-item" role="presentation">
     <a href="../preregistration/dealer_examples?id={{ attendee.group.id }}" class="nav-link{% if 'dealer_examples' in c.PAGE_PATH %} active{% endif %}">
-      <i class="fa fa-image"></i> Dealer Examples
+      <i class="fa fa-image"></i> {{ c.DEALER_TERM | title }} Examples
     </a>
   </li>
   {% endif %}
