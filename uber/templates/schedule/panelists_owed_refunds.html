@@ -4,17 +4,6 @@
 
 <h2>Panelists Owed Refunds</h2>
 
-The following is a list of {{ panelists|length }} attendee{{ panelists|length|pluralize }} with panelist ribbons who have paid
-and not been refunded:
-<ul>
-{% for attendee in panelists %}
-    <li>
-        {{ attendee|form_link }}
-        {% if attendee.group_id %}
-            (<a href="../group_admin/form?id={{ attendee.group_id }}">{{ attendee.group.name }}</a>)
-        {% endif %}
-    </li>
-{% endfor %}
-</ul>
+<p>{{ c.EVENT_NAME }} does not provide refunds for panelist badges.</p>
 
 {% endblock %}

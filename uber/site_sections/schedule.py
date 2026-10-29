@@ -1,22 +1,34 @@
 import json
-import ics
-import pytz
-import cherrypy
-
 from collections import defaultdict
 from datetime import datetime, time, timedelta
-from dateutil import parser as dateparser
 from time import mktime
+
+import cherrypy
+import ics
+import pytz
+from dateutil import parser as dateparser
 from pockets import listify
-from pockets.autolog import log
 from sqlalchemy.orm import joinedload
 
 from uber.config import c
-from uber.decorators import ajax, ajax_gettable, all_renderable, cached, csrf_protected, csv_file, render, schedule_view, site_mappable
+from uber.decorators import (
+    ajax,
+    all_renderable,
+    csrf_protected,
+    csv_file,
+    render,
+    schedule_view,
+    site_mappable,
+)
 from uber.errors import HTTPRedirect
 from uber.forms import load_forms
-from uber.models import AssignedPanelist, Attendee, Event, EventLocation, PanelApplication
-from uber.utils import check, localized_now, normalize_newlines, validate_model, load_locations_from_config
+from uber.models import AssignedPanelist, Event, EventLocation, PanelApplication
+from uber.utils import (
+    load_locations_from_config,
+    localized_now,
+    normalize_newlines,
+    validate_model,
+)
 
 
 @all_renderable()
@@ -380,11 +392,7 @@ class Root:
 
     def panelists_owed_refunds(self, session):
         return {
-            'panelists': [a for a in session.query(Attendee)
-                                            .filter_by(ribbon=c.PANELIST_RIBBON)
-                                            .options(joinedload(Attendee.group))
-                                            .order_by(Attendee.full_name).all()
-                          if a.paid_for_badge and not a.has_been_refunded]
+            'panelists': []
         }
     
     @csv_file

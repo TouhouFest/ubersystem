@@ -1,8 +1,8 @@
+import json
 from collections import defaultdict
 from datetime import datetime, timedelta
 
 import cherrypy
-import json
 from pockets import groupify
 from pockets.autolog import log
 from sqlalchemy import func, literal_column
@@ -11,11 +11,18 @@ from sqlalchemy.orm import joinedload
 from uber.config import c
 from uber.decorators import ajax, all_renderable, csrf_protected, csv_file, render
 from uber.errors import HTTPRedirect
-from uber.models import AssignedPanelist, Attendee, AutomatedEmail, Event, EventFeedback, \
-    PanelApplicant, PanelApplication, GuestGroup
-from uber.utils import add_opt, check, localized_now, validate_model
 from uber.forms import load_forms
+from uber.models import (
+    AssignedPanelist,
+    AutomatedEmail,
+    Event,
+    EventFeedback,
+    GuestGroup,
+    PanelApplicant,
+    PanelApplication,
+)
 from uber.tasks.email import send_email
+from uber.utils import add_opt, validate_model
 
 
 @all_renderable()
@@ -330,32 +337,7 @@ class Root:
 
     @ajax
     def create_badge(self, session, applicant_id):
-        ids = []
-        try:
-            pa = session.panel_applicant(applicant_id)
-            attendee = Attendee(
-                placeholder=True,
-                paid=c.NEED_NOT_PAY,
-                ribbon=c.PANELIST_RIBBON,
-                badge_type=c.ATTENDEE_BADGE,
-                first_name=pa.first_name,
-                last_name=pa.last_name,
-                email=pa.email,
-                cellphone=pa.cellphone
-            )
-            session.add(attendee)
-
-            applicants = session.query(PanelApplicant).filter_by(
-                first_name=pa.first_name, last_name=pa.last_name, email=pa.email)
-            for applicant in applicants:
-                ids.append(applicant.id)
-                applicant.attendee_id = attendee.id
-            session.commit()
-        except Exception:
-            log.error('unexpected error adding new panelist', exc_info=True)
-            return {'error': 'Unexpected error: unable to add attendee'}
-        else:
-            return {'added': ids}
+        return {'error': 'Complimentary panelist badges are not supported.'}
 
     def panel_feedback(self, session, event_id, **params):
         feedback = session.query(EventFeedback).filter_by(
