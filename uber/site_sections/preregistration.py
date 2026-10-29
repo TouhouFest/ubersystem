@@ -1327,7 +1327,7 @@ class Root:
         group = session.group(id)
         if group.is_dealer:
             forms = load_forms(params, group, ['ExamplesUpload'])
-            examples_upload = next(forms.values())
+            examples_upload, = forms.values()
 
             if cherrypy.request.method == 'POST':
                 if group.status not in c.DEALER_EDITABLE_STATUSES:
