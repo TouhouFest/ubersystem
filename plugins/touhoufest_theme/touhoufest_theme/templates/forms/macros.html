@@ -153,7 +153,7 @@
 {% endmacro %}
 
 {% macro card_select(target_field, opts, text_class="text-center", help_text="", disabled_opts=[], target_field_id="", disabled_card_text="Sold Out") %}
-{# 
+{#
     A set of card elements generated from opts. Each item in opts should include the following fields:
         name (str): The title displayed at the top of the card.
         desc (str): A short description of the card. Will be rendered as HTML.
@@ -339,7 +339,7 @@
 
 <script type="text/javascript">
   serverValidationPassed = false;
-  
+
   var runServerValidations_{{ form_id|replace('-','_') }} = function($form, submit_button_name, submit_button_val) {
     var form_data = new FormData($('#{{ form_id }}')[0]);
     var form_list = {{ form_list|safe }};
@@ -420,7 +420,7 @@
       }
     });
   };
-  
+
 
   $(function () {
     $("#form-validations-{{ form_id }}").hide();
