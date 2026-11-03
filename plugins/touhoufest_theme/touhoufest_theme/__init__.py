@@ -1,6 +1,8 @@
 import os
 
+from touhoufest_theme.contact import contact
 from uber.jinja import template_overrides
+from uber.server import Root
 from uber.utils import static_overrides
 
 
@@ -13,3 +15,6 @@ def on_load() -> None:
     template_dir = os.path.join(plugin_dir, 'templates')
     if os.path.isdir(template_dir):
         template_overrides(template_dir)
+
+    Root.contact = contact
+
